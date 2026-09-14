@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "default": "idle",
+  "motions": {
+    "idle": {
+      "label": "待機",
+      "tracks": [
+        { "target": "character", "property": "translateX", "wave": "sin", "amplitude": 1.2, "period": 6.2, "phase": 0, "delay": 0, "origin": { "x": 627, "y": 1195 } },
+        { "target": "character", "property": "translateY", "wave": "sin", "amplitude": 1.4, "period": 6.2, "phase": 0, "delay": 0, "origin": { "x": 627, "y": 1195 } },
+        { "target": "character", "property": "rotation", "wave": "sin", "amplitude": 0.55, "period": 6.2, "phase": 0, "delay": 0, "origin": { "x": 627, "y": 1195 } },
+        { "target": "body", "property": "translateY", "wave": "sin", "amplitude": -1.5, "period": 4.4, "phase": 0, "delay": 0, "origin": { "x": 627, "y": 1195 } },
+        { "target": "body", "property": "scaleY", "wave": "sin", "amplitude": 0.0018, "period": 4.4, "phase": 0, "delay": 0, "origin": { "x": 627, "y": 1195 } },
+        { "target": "hair_sway", "property": "rotation", "wave": "sin", "amplitude": 1.15, "period": 5.8, "phase": 0, "delay": 0.18, "origin": { "x": 620, "y": 205 } }
+      ]
+    }
+  }
+}

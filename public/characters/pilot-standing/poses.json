@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "default": "normal",
+  "poses": {
+    "normal": {
+      "label": "通常",
+      "master": "normal",
+      "parts": { "pose": "pose_normal" },
+      "transform": {
+        "target": "pose_root",
+        "x": 0,
+        "y": 0,
+        "rotateDegrees": 0,
+        "origin": { "x": 627, "y": 1195 }
+      }
+    },
+    "explain": {
+      "label": "解説",
+      "master": "point",
+      "parts": { "pose": "pose_explain" },
+      "transform": {
+        "target": "pose_root",
+        "x": -3,
+        "y": -1,
+        "rotateDegrees": -0.8,
+        "origin": { "x": 627, "y": 1195 }
+      }
+    },
+    "alert": {
+      "label": "注目",
+      "master": "alert",
+      "parts": { "pose": "pose_alert" },
+      "transform": {
+        "target": "pose_root",
+        "x": 2,
+        "y": -5,
+        "rotateDegrees": 0.9,
+        "origin": { "x": 627, "y": 1195 }
+      }
+    }
+  }
+}

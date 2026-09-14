@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "default": "neutral",
+  "expressions": {
+    "neutral": {
+      "label": "通常",
+      "parts": {
+        "eye_left": "eye_left_open",
+        "eye_right": "eye_right_open",
+        "brows": "brow_normal",
+        "mouth": "mouth_closed"
+      },
+      "visible": []
+    },
+    "happy": {
+      "label": "笑顔",
+      "parts": {
+        "eye_left": "eye_left_smile",
+        "eye_right": "eye_right_smile",
+        "brows": "brow_raised",
+        "mouth": "mouth_smile"
+      },
+      "visible": ["blush"]
+    },
+    "surprised": {
+      "label": "驚き",
+      "parts": {
+        "eye_left": "eye_left_open",
+        "eye_right": "eye_right_open",
+        "brows": "brow_raised",
+        "mouth": "mouth_o"
+      },
+      "visible": []
+    },
+    "worried": {
+      "label": "困り",
+      "parts": {
+        "eye_left": "eye_left_half",
+        "eye_right": "eye_right_half",
+        "brows": "brow_worried",
+        "mouth": "mouth_small"
+      },
+      "visible": []
+    }
+  }
+}

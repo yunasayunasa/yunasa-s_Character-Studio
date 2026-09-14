@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 2,
+  "id": "pilot-standing",
+  "label": "直立パイロット",
+  "description": "既存の直立版SVG資産から移行した完全サンプル",
+  "files": {
+    "svg": "character.svg",
+    "expressions": "expressions.json",
+    "motions": "motions.json",
+    "poses": "poses.json",
+    "emotes": "emotes.json"
+  },
+  "canvas": {
+    "width": 1254,
+    "height": 1254
+  },
+  "anchors": {
+    "feet": { "x": 627, "y": 1195 },
+    "head": { "x": 620, "y": 330 },
+    "eyes": { "x": 620, "y": 299 },
+    "mouth": { "x": 620, "y": 356 }
+  },
+  "requiredParts": [
+    "character",
+    "master_normal",
+    "master_point",
+    "master_alert",
+    "head",
+    "pose_root",
+    "hair_sway",
+    "iris_left",
+    "iris_right"
+  ],
+  "optionalParts": ["blush", "sweat", "question", "exclamation", "anger", "shock"],
+  "effectParts": ["blush", "sweat", "question", "exclamation", "anger", "shock"],
+  "partSlots": {
+    "eye_left": ["eye_left_open", "eye_left_half", "eye_left_closed", "eye_left_smile"],
+    "eye_right": ["eye_right_open", "eye_right_half", "eye_right_closed", "eye_right_smile"],
+    "brows": ["brow_normal", "brow_raised", "brow_worried"],
+    "mouth": ["mouth_closed", "mouth_small", "mouth_medium", "mouth_wide", "mouth_smile", "mouth_o", "mouth_smile_point"],
+    "pose": ["pose_normal", "pose_explain", "pose_alert"]
+  },
+  "assetModel": {
+    "defaultMaster": "normal",
+    "masters": {
+      "normal": { "label": "通常マスター", "root": "master_normal" },
+      "point": { "label": "指差し互換マスター", "root": "master_point" },
+      "alert": { "label": "注目互換マスター", "root": "master_alert" }
+    },
+    "sharedParts": {
+      "eye_left": ["eye_left_open", "eye_left_half", "eye_left_closed", "eye_left_smile"],
+      "eye_right": ["eye_right_open", "eye_right_half", "eye_right_closed", "eye_right_smile"],
+      "brows": ["brow_normal", "brow_raised", "brow_worried"],
+      "mouth": ["mouth_closed", "mouth_small", "mouth_medium", "mouth_wide", "mouth_smile", "mouth_o"],
+      "effects": ["blush", "sweat", "question", "exclamation", "anger", "shock"]
+    },
+    "masterOverrides": {
+      "point": {
+        "parts": { "mouth_smile": "mouth_smile_point" }
+      }
+    }
+  },
+  "controllers": {
+    "blink": {
+      "closedParts": {
+        "eye_left": "eye_left_closed",
+        "eye_right": "eye_right_closed"
+      },
+      "intervalMs": [2600, 5600],
+      "durationMs": 130
+    },
+    "lipSync": {
+      "slot": "mouth",
+      "parts": ["mouth_closed", "mouth_small", "mouth_medium", "mouth_wide"],
+      "thresholds": [0.09, 0.26, 0.54],
+      "noiseFloor": 0.025
+    },
+    "gaze": {
+      "targets": ["iris_left", "iris_right"],
+      "maxX": 4,
+      "maxY": 3
+    }
+  },
+  "capabilities": {
+    "expressions": true,
+    "blink": true,
+    "lipSync": ["manual", "audio"],
+    "gaze": true,
+    "motions": ["idle"],
+    "poses": true,
+    "emotes": true,
+    "subtitles": ["srt", "vtt"],
+    "exports": ["png", "gif", "video", "svg-json", "psd"]
+  },
+  "psdLayers": [
+    { "name": "master_normal", "partId": "master_normal" },
+    { "name": "master_point", "partId": "master_point" },
+    { "name": "master_alert", "partId": "master_alert" },
+    { "name": "hair_sway", "partId": "hair_sway" },
+    { "name": "eye_left_base", "partId": "eye_left_base" },
+    { "name": "eye_left_open", "partId": "eye_left_open" },
+    { "name": "eye_left_half", "partId": "eye_left_half" },
+    { "name": "eye_left_closed", "partId": "eye_left_closed" },
+    { "name": "eye_left_smile", "partId": "eye_left_smile" },
+    { "name": "eye_right_base", "partId": "eye_right_base" },
+    { "name": "eye_right_open", "partId": "eye_right_open" },
+    { "name": "eye_right_half", "partId": "eye_right_half" },
+    { "name": "eye_right_closed", "partId": "eye_right_closed" },
+    { "name": "eye_right_smile", "partId": "eye_right_smile" },
+    { "name": "brow_normal", "partId": "brow_normal" },
+    { "name": "brow_raised", "partId": "brow_raised" },
+    { "name": "brow_worried", "partId": "brow_worried" },
+    { "name": "mouth_base", "partId": "mouth_base" },
+    { "name": "mouth_closed", "partId": "mouth_closed" },
+    { "name": "mouth_small", "partId": "mouth_small" },
+    { "name": "mouth_medium", "partId": "mouth_medium" },
+    { "name": "mouth_wide", "partId": "mouth_wide" },
+    { "name": "mouth_smile", "partId": "mouth_smile" },
+    { "name": "mouth_o", "partId": "mouth_o" },
+    { "name": "mouth_smile_point", "partId": "mouth_smile_point" },
+    { "name": "blush", "partId": "blush" },
+    { "name": "sweat", "partId": "sweat" },
+    { "name": "question", "partId": "question" },
+    { "name": "exclamation", "partId": "exclamation" },
+    { "name": "anger", "partId": "anger" },
+    { "name": "shock", "partId": "shock" },
+    { "name": "pose_normal", "partId": "pose_normal" },
+    { "name": "pose_explain", "partId": "pose_explain" },
+    { "name": "pose_alert", "partId": "pose_alert" }
+  ],
+  "source": {
+    "pilotAsset": "standing-video/source/standing-vector.svg",
+    "note": "元ZIP・元SVGは変更せず、移行スクリプトでパック化"
+  }
+}

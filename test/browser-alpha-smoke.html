@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>WebM alpha smoke</title>
+<pre id="result">RUNNING</pre>
+<script type="module">
+const result = document.querySelector("#result");
+try {
+  if (!globalThis.VideoEncoder || !globalThis.VideoDecoder || !globalThis.VideoFrame) throw new Error("UNSUPPORTED: WebCodecs is unavailable");
+  const candidates = ["vp09.00.10.08", "vp8"];
+  let selected = null;
+  for (const codec of candidates) {
+    const config = { codec, width: 2, height: 2, framerate: 1, bitrate: 800000, latencyMode: "quality", alpha: "keep" };
+    const support = await VideoEncoder.isConfigSupported(config);
+    if (support.supported && support.config?.alpha === "keep") { selected = config; break; }
+  }
+  if (!selected) throw new Error("UNSUPPORTED: transparent VideoEncoder config is unavailable");
+
+  const chunks = [];
+  let decoderConfig = null;
+  const encoder = new VideoEncoder({
+    output(chunk, metadata) { chunks.push(chunk); decoderConfig ??= metadata?.decoderConfig ?? null; },
+    error(error) { throw error; },
+  });
+  encoder.configure(selected);
+  const canvas = new OffscreenCanvas(2, 2);
+  const context = canvas.getContext("2d", { alpha: true });
+  context.clearRect(0, 0, 2, 2);
+  context.fillStyle = "rgba(255,0,0,1)";
+  context.fillRect(0, 0, 1, 1);
+  const input = new VideoFrame(canvas, { timestamp: 0 });
+  encoder.encode(input, { keyFrame: true });
+  input.close();
+  await encoder.flush();
+  encoder.close();
+
+  let decoded = null;
+  const decoder = new VideoDecoder({ output(frame) { decoded = frame; }, error(error) { throw error; } });
+  decoder.configure(decoderConfig ?? { codec: selected.codec });
+  for (const chunk of chunks) decoder.decode(chunk);
+  await decoder.flush();
+  decoder.close();
+  if (!decoded) throw new Error("FAIL: no decoded frame");
+  const rgba = new Uint8Array(16);
+  await decoded.copyTo(rgba, { format: "RGBA" });
+  decoded.close();
+  const transparentAlpha = [rgba[7], rgba[11], rgba[15]];
+  if (transparentAlpha.some((alpha) => alpha > 8)) throw new Error(`FAIL: alpha was discarded (${transparentAlpha.join(",")})`);
+  result.textContent = `PASS codec=${selected.codec} alpha=${transparentAlpha.join(",")}`;
+} catch (error) {
+  result.textContent = error.message;
+}
+</script>

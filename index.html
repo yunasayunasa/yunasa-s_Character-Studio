@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#171a22" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>SVG Character Studio</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">SVG CHARACTER STUDIO</p>
+          <h1>立ち絵プレビュー</h1>
+        </div>
+        <button id="motion-toggle" class="icon-button" type="button" aria-pressed="false">
+          一時停止
+        </button>
+      </header>
+
+      <section class="stage-card" aria-label="キャラクタープレビュー">
+        <div id="stage" class="stage">
+          <div id="character-host" class="character-host" aria-live="polite"></div>
+          <div class="stage-hint" aria-hidden="true">画面をなぞって視線を動かせます</div>
+        </div>
+      </section>
+
+      <section class="control-sheet" aria-label="プレビュー設定">
+        <div class="handle" aria-hidden="true"></div>
+
+        <label class="field">
+          <span>キャラクター</span>
+          <select id="character-select"></select>
+        </label>
+
+        <fieldset class="field expression-field">
+          <legend>表情</legend>
+          <div id="expression-list" class="pill-list"></div>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend>ポーズ</legend>
+          <div id="pose-list" class="pill-list"></div>
+        </fieldset>
+
+        <label class="field">
+          <span>エモート</span>
+          <select id="emote-select"></select>
+        </label>
+
+        <fieldset class="field mode-field">
+          <legend>口パク</legend>
+          <div class="segmented-control">
+            <button type="button" data-mode="manual" aria-pressed="true">手動</button>
+            <button type="button" data-mode="audio" aria-pressed="false">音声</button>
+            <button type="button" data-mode="subtitle" aria-pressed="false">字幕</button>
+            <button type="button" data-mode="combined" aria-pressed="false">音声＋字幕</button>
+          </div>
+        </fieldset>
+
+        <div id="manual-panel" class="mode-panel">
+          <label class="field slider-field" for="mouth-slider">
+            <span>口の開き</span>
+            <input id="mouth-slider" type="range" min="0" max="1" step="0.01" value="0" />
+          </label>
+        </div>
+
+        <div id="audio-panel" class="mode-panel" hidden>
+          <label class="file-button" for="audio-file">音声ファイルを選ぶ</label>
+          <input id="audio-file" type="file" accept="audio/*,.m4a" />
+          <audio id="audio-player" controls playsinline preload="metadata" hidden></audio>
+          <p class="help">選択時に音量エンベロープを事前解析します。音声はアップロードされません。</p>
+        </div>
+
+        <div id="subtitle-panel" class="mode-panel" hidden>
+          <label class="file-button" for="subtitle-file">SRT / VTTを選ぶ</label>
+          <input id="subtitle-file" type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" />
+          <div class="transport-row">
+            <button id="subtitle-play" type="button" class="secondary-button" disabled>字幕を再生</button>
+            <output id="subtitle-time">00:00</output>
+          </div>
+          <p class="help">字幕だけでも句読点を考慮した疑似口パクを生成します。</p>
+        </div>
+
+        <section class="export-section" aria-labelledby="export-title">
+          <h2 id="export-title">書き出し</h2>
+          <div class="export-settings">
+            <label class="field compact-field">
+              <span>品質</span>
+              <select id="quality-select">
+                <option value="light">軽量（320px / 8fps）</option>
+                <option value="standard" selected>標準（512px / 12fps）</option>
+                <option value="high">高品質（768px / 20fps）</option>
+              </select>
+            </label>
+            <label class="field compact-field">
+              <span>音声なしの長さ（秒）</span>
+              <input id="manual-duration" type="number" min="0.1" max="600" step="0.1" value="2" inputmode="decimal" />
+            </label>
+            <label class="field compact-field">
+              <span>分割秒数（0で分割なし）</span>
+              <input id="split-seconds" type="number" min="0" max="600" step="1" value="15" inputmode="numeric" />
+            </label>
+          </div>
+          <output id="export-estimate" class="estimate"></output>
+          <div class="export-grid">
+            <button type="button" data-export="png">PNG</button>
+            <button type="button" data-export="gif">透過GIF</button>
+            <button type="button" data-export="video">透過WebM</button>
+            <button type="button" data-export="subtitleBatch">字幕区間GIF ZIP</button>
+            <button type="button" data-export="pack">SVG＋JSON</button>
+            <button type="button" data-export="psd">レイヤーPSD</button>
+          </div>
+          <progress id="export-progress" value="0" max="1" hidden></progress>
+          <a id="download-result" class="file-button download-result" hidden>生成したファイルを保存</a>
+          <p class="help">GIF・WebMは任意時刻の状態を順に評価するオフライン書き出しです。音声モードは音声全長、字幕モードは字幕末尾まで出力します。</p>
+        </section>
+
+        <details class="details">
+          <summary>詳細設定</summary>
+          <label class="toggle-row">
+            <span>視線追従</span>
+            <input id="gaze-toggle" type="checkbox" checked />
+          </label>
+          <div class="pack-import">
+            <label class="file-button" for="pack-files">character-pack.zip を端末へ追加</label>
+            <input id="pack-files" type="file" multiple accept=".zip,.svg,.json,.webp,.psd,application/zip,image/svg+xml,application/json,image/webp,image/vnd.adobe.photoshop" />
+            <button id="delete-pack" type="button" class="secondary-button danger-button" disabled>選択中の端末パックを削除</button>
+            <p class="help">ZIP 1ファイルを推奨します。旧方式のSVG＋JSON複数選択にも対応し、検証後にIndexedDBへ保存します。</p>
+          </div>
+        </details>
+
+        <p id="status" class="status" role="status">読み込み中…</p>
+      </section>
+    </main>
+
+    <div id="subtitle-overlay" class="subtitle-overlay" aria-live="polite"></div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "default": "none",
+  "emotes": {
+    "none": { "label": "なし", "visible": [] },
+    "blush": { "label": "頬染め", "visible": ["blush"] },
+    "sweat": { "label": "汗", "visible": ["sweat"] },
+    "question": { "label": "疑問符", "visible": ["question"] },
+    "exclamation": { "label": "感嘆符", "visible": ["exclamation"] },
+    "anger": { "label": "怒り", "visible": ["anger"] },
+    "shock": { "label": "ショック", "visible": ["shock"] }
+  }
+}

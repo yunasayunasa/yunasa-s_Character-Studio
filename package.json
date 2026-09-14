@@ -1,0 +1,16 @@
+{
+  "name": "svg-character-studio",
+  "version": "2.0.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "generate:assets": "node tools/generate-icons.mjs",
+    "sync:characters": "node tools/sync-characters.mjs",
+    "test": "node --test",
+    "verify": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

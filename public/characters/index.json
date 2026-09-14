@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "characters": [
+    {
+      "id": "pilot-standing",
+      "label": "直立パイロット",
+      "path": "./public/characters/pilot-standing/"
+    }
+  ]
+}
