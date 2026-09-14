@@ -78,6 +78,7 @@ h1 { margin: 0; font-size: clamp(1.25rem, 5vw, 1.8rem); line-height: 1.15; }
   height: min(56svh, calc((100vw - 2rem) * 1.25));
   isolation: isolate;
   overflow: hidden;
+  touch-action: pan-y pinch-zoom;
   background-color: #f4eee5;
   background-image:
     linear-gradient(45deg, rgba(55, 48, 39, 0.06) 25%, transparent 25%),
@@ -96,6 +97,19 @@ h1 { margin: 0; font-size: clamp(1.25rem, 5vw, 1.8rem); line-height: 1.15; }
 }
 
 .character-host svg { overflow: visible; }
+
+.preview-debug {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 4;
+  padding: 0.3rem 0.45rem;
+  border-radius: 0.4rem;
+  color: #d8ffcf;
+  background: rgba(8, 12, 8, 0.82);
+  font: 0.68rem/1.3 ui-monospace, monospace;
+  pointer-events: none;
+}
 
 .stage-hint {
   position: absolute;
@@ -167,6 +181,8 @@ input[type="number"] {
 input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--accent); }
 input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .file-button { display: inline-grid; place-items: center; width: 100%; padding: 0 1rem; }
+.character-picker { padding-bottom: 0.2rem; }
+.add-character-button { min-height: 44px; border-style: dashed; color: var(--accent); font-weight: 750; }
 .download-result { margin-top: 0.7rem; border-color: transparent; color: #2a1b09; background: var(--accent); font-weight: 800; text-decoration: none; }
 audio { width: 100%; margin-top: 0.65rem; }
 .help, .status { margin: 0.55rem 0 0; color: #9fa1aa; font-size: 0.72rem; line-height: 1.5; }
@@ -223,4 +239,21 @@ progress { width: 100%; height: 0.45rem; margin-top: 0.7rem; accent-color: var(-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
   .stage-hint { display: none; }
+}
+
+@media (pointer: coarse), (hover: none) {
+  body { background: #101117; }
+  .stage-card { box-shadow: 0 0.6rem 1.4rem rgba(0, 0, 0, 0.2); }
+  .control-sheet {
+    background: #1d1f29;
+    box-shadow: 0 0.55rem 1.3rem rgba(0, 0, 0, 0.18);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .stage-hint,
+  .subtitle-overlay {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .subtitle-overlay { box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.22); }
 }

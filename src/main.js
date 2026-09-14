@@ -1,6 +1,7 @@
 import { AudioLipSync } from "./engine/audio-lip-sync.js";
 import { analyzeAudioFile } from "./engine/audio-analysis.js";
 import { CharacterEngine } from "./engine/character-engine.js";
+import { classifyTouchGaze, normalizeGazePoint } from "./engine/gaze-input.js";
 import { loadCharacterManifest, loadCharacterPack } from "./engine/character-loader.js";
 import { deleteStoredPack, importPackFiles, importPackZip, listStoredPacks, loadStoredPack } from "./engine/pack-store.js";
 import { SubtitleLipSync } from "./engine/subtitle-lip-sync.js";
@@ -24,6 +25,7 @@ const elements = {
   subtitlePlay: document.querySelector("#subtitle-play"),
   subtitleTime: document.querySelector("#subtitle-time"),
   subtitleOverlay: document.querySelector("#subtitle-overlay"),
+  previewDebug: document.querySelector("#preview-debug"),
   gazeToggle: document.querySelector("#gaze-toggle"),
   packFiles: document.querySelector("#pack-files"),
   deletePack: document.querySelector("#delete-pack"),
@@ -46,10 +48,18 @@ const subtitleLipSync = new SubtitleLipSync({
   onEnded: () => setSubtitlePlaying(false),
 });
 const exporter = new ExportManager(engine, updateExportProgress, presentDownload);
+if (new URLSearchParams(location.search).get("debug-preview") === "1") {
+  elements.previewDebug.hidden = false;
+  engine.onPreviewMetrics = (metrics) => {
+    elements.previewDebug.value = `${metrics.fps.toFixed(1)}fps / ${metrics.frameMs.toFixed(2)}ms / DOM ${metrics.domUpdates.toFixed(1)} / target ${metrics.targetFps}`;
+  };
+}
 let manifest = [];
 let currentMode = "manual";
 let audioEnvelope = null;
 let downloadUrl = null;
+let touchGaze = null;
+let gazeResetTimer = 0;
 
 boot().catch(showError);
 
@@ -151,9 +161,11 @@ function bindUi() {
     }
   });
 
-  elements.stage.addEventListener("pointermove", updateGaze);
-  elements.stage.addEventListener("pointerleave", () => engine.setGaze(0, 0));
-  elements.stage.addEventListener("pointercancel", () => engine.setGaze(0, 0));
+  elements.stage.addEventListener("pointermove", handleGazeMove);
+  elements.stage.addEventListener("pointerdown", handleGazeStart);
+  elements.stage.addEventListener("pointerup", handleGazeEnd);
+  elements.stage.addEventListener("pointerleave", (event) => { if (event.pointerType === "mouse") engine.setGaze(0, 0); });
+  elements.stage.addEventListener("pointercancel", cancelTouchGaze);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       audioLipSync.stop();
@@ -285,10 +297,42 @@ function setSubtitlePlaying(playing) {
   elements.subtitlePlay.textContent = playing ? "停止" : "字幕を再生";
 }
 
-function updateGaze(event) {
+function setGazeFromPoint(clientX, clientY) {
   if (!elements.gazeToggle.checked) return engine.setGaze(0, 0);
   const bounds = elements.stage.getBoundingClientRect();
-  engine.setGaze(((event.clientX - bounds.left) / bounds.width) * 2 - 1, ((event.clientY - bounds.top) / bounds.height) * 2 - 1);
+  const gaze = normalizeGazePoint(bounds, clientX, clientY);
+  engine.setGaze(gaze.x, gaze.y);
+}
+
+function handleGazeStart(event) {
+  if (event.pointerType === "mouse") return;
+  clearTimeout(gazeResetTimer);
+  touchGaze = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, dragging: false };
+}
+
+function handleGazeMove(event) {
+  if (event.pointerType === "mouse") return setGazeFromPoint(event.clientX, event.clientY);
+  if (!touchGaze || touchGaze.pointerId !== event.pointerId) return;
+  if (!touchGaze.dragging && classifyTouchGaze(touchGaze.x, touchGaze.y, event.clientX, event.clientY) === "drag") {
+    touchGaze.dragging = true;
+    elements.stage.setPointerCapture?.(event.pointerId);
+  }
+  if (!touchGaze.dragging) return;
+  event.preventDefault();
+  setGazeFromPoint(event.clientX, event.clientY);
+}
+
+function handleGazeEnd(event) {
+  if (!touchGaze || touchGaze.pointerId !== event.pointerId) return;
+  if (!touchGaze.dragging && classifyTouchGaze(touchGaze.x, touchGaze.y, event.clientX, event.clientY) === "tap") setGazeFromPoint(event.clientX, event.clientY);
+  if (touchGaze.dragging) elements.stage.releasePointerCapture?.(event.pointerId);
+  touchGaze = null;
+  gazeResetTimer = setTimeout(() => engine.setGaze(0, 0), 900);
+}
+
+function cancelTouchGaze() {
+  touchGaze = null;
+  engine.setGaze(0, 0);
 }
 
 function characterOption(item) {

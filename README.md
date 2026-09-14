@@ -19,6 +19,8 @@
 - ZIP 1ファイルまたは旧来の複数ファイルから、検証後にIndexedDBへパックを保存
 - PNG、透過GIF、透過対応を事前確認するWebM、losslessパックZIP、初期visibility付き明示partレイヤーPSD
 - PWA、iPhoneセーフエリア、44px以上のタップ領域、バックグラウンド負荷停止
+- Realtime Preview専用のSVG DOMキャッシュと差分更新。タッチ端末は30fpsを目標に間引き、書き出しFPSとは分離
+- PCはポインター追従、タッチ端末はタップまたは意図的な横ドラッグで視線を操作し、通常の縦スクロールを維持
 
 ## 起動
 
@@ -40,11 +42,14 @@ PCでは `http://127.0.0.1:4173` を開きます。iPhone/PWAではHTTPS配信�
 
 ## キャラクター追加
 
-配布時は `public/characters/<id>/` にパックを置き、`npm run sync:characters` を実行します。利用者は `character-name.zip` を詳細設定から選べます。キャラクター追加時にアプリ本体のJavaScript変更は不要です。
+配布時は `public/characters/<id>/` にパックを置き、`npm run sync:characters` を実行します。利用者はキャラクター選択欄の直下にある「＋ キャラクターを追加」から `character-name.zip` を選べます。既存のvalidatorとIndexedDB保存をそのまま使用し、キャラクター追加時にアプリ本体のJavaScript変更は不要です。
+
+開発時に `?debug-preview=1` をURLへ付けると、Preview FPS、平均frame処理時間、1 frame当たりのDOM更新数を表示します。この計測はRealtime Previewだけが対象で、GIF/WebM等のオフラインレンダリング条件を変更しません。
 
 - [キャラクターパック仕様](./docs/character-pack-spec.md)
 - [新規キャラクター制作手順](./docs/character-production-guide.md)
 - [タイムライン・出力設計](./docs/export-and-motion-design.md)
+- [Realtime Preview・モバイル入力設計](./docs/realtime-preview-design.md)
 - [変更内容一覧](./docs/change-list.md)
 - [最終QA](./docs/final-qa.md)
 - [既存パイロット監査](./docs/pilot-audit.md)

@@ -27,17 +27,20 @@
       <section class="stage-card" aria-label="キャラクタープレビュー">
         <div id="stage" class="stage">
           <div id="character-host" class="character-host" aria-live="polite"></div>
-          <div class="stage-hint" aria-hidden="true">画面をなぞって視線を動かせます</div>
+          <div class="stage-hint" aria-hidden="true">マウス／タップで視線を動かせます</div>
+          <output id="preview-debug" class="preview-debug" hidden></output>
         </div>
       </section>
 
       <section class="control-sheet" aria-label="プレビュー設定">
         <div class="handle" aria-hidden="true"></div>
 
-        <label class="field">
+        <div class="field character-picker">
           <span>キャラクター</span>
           <select id="character-select"></select>
-        </label>
+          <label id="add-character-button" class="file-button add-character-button" for="pack-files">＋ キャラクターを追加</label>
+          <input id="pack-files" type="file" multiple accept=".zip,.svg,.json,.webp,.psd,application/zip,image/svg+xml,application/json,image/webp,image/vnd.adobe.photoshop" />
+        </div>
 
         <fieldset class="field expression-field">
           <legend>表情</legend>
@@ -129,10 +132,8 @@
             <input id="gaze-toggle" type="checkbox" checked />
           </label>
           <div class="pack-import">
-            <label class="file-button" for="pack-files">character-pack.zip を端末へ追加</label>
-            <input id="pack-files" type="file" multiple accept=".zip,.svg,.json,.webp,.psd,application/zip,image/svg+xml,application/json,image/webp,image/vnd.adobe.photoshop" />
             <button id="delete-pack" type="button" class="secondary-button danger-button" disabled>選択中の端末パックを削除</button>
-            <p class="help">ZIP 1ファイルを推奨します。旧方式のSVG＋JSON複数選択にも対応し、検証後にIndexedDBへ保存します。</p>
+            <p class="help">追加はキャラクター選択欄のボタンから行います。ZIPを既存validatorで検証後、IndexedDBへ保存します。</p>
           </div>
         </details>
 

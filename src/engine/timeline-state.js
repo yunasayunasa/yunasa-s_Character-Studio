@@ -1,41 +1,71 @@
 const TRANSFORM_ORDER = ["pose", "motion", "expression", "gaze"];
 
 export function createTimelineState(pack, snapshot, time, source = {}) {
-  const t = Math.max(0, Number(time) || 0);
+  const runtime = createTimelineRuntime();
+  prepareTimelineStaticState(pack, snapshot, runtime);
+  return evaluateTimelineStateInto(pack, snapshot, time, source, runtime);
+}
+
+export function createTimelineRuntime() {
+  return {
+    baseParts: {},
+    baseEffects: [],
+    pose: null,
+    motion: null,
+    expressionName: null,
+    poseName: null,
+    master: null,
+    transformChannels: new Map(),
+    state: { time: 0, expression: null, pose: null, master: null, parts: {}, effects: [], transforms: {}, lipLevel: 0 },
+  };
+}
+
+export function prepareTimelineStaticState(pack, snapshot, runtime) {
   const expressionName = snapshot.expression ?? pack.expressions.default;
   const poseName = snapshot.pose ?? pack.poses?.default;
   const expression = pack.expressions.expressions[expressionName] ?? pack.expressions.expressions[pack.expressions.default];
   const pose = pack.poses?.poses?.[poseName] ?? {};
-  const master = pose.master ?? snapshot.master ?? pack.config.assetModel.defaultMaster;
-  const parts = { ...(expression.parts ?? {}), ...(pose.parts ?? {}) };
-  const effects = new Set([...(expression.visible ?? []), ...(snapshot.emoteVisible ?? [])]);
-  const transforms = new Map();
+  runtime.expressionName = expressionName;
+  runtime.poseName = poseName;
+  runtime.pose = pose;
+  runtime.master = pose.master ?? snapshot.master ?? pack.config.assetModel.defaultMaster;
+  runtime.motion = pack.motions.motions[snapshot.motion ?? pack.motions.default] ?? pack.motions.motions[pack.motions.default];
+  clearObject(runtime.baseParts);
+  Object.assign(runtime.baseParts, expression.parts ?? {}, pose.parts ?? {});
+  runtime.baseEffects.length = 0;
+  for (const id of expression.visible ?? []) if (!runtime.baseEffects.includes(id)) runtime.baseEffects.push(id);
+  for (const id of snapshot.emoteVisible ?? []) if (!runtime.baseEffects.includes(id)) runtime.baseEffects.push(id);
+  return runtime;
+}
 
-  addPoseTransform(transforms, pose.transform);
-  const motionName = snapshot.motion ?? pack.motions.default;
-  const motion = pack.motions.motions[motionName] ?? pack.motions.motions[pack.motions.default];
-  for (const track of motion?.tracks ?? []) addTrackTransform(transforms, track, t, snapshot.reducedMotion);
-  addGazeTransforms(transforms, pack.config.controllers.gaze, snapshot.gaze);
+export function evaluateTimelineStateInto(pack, snapshot, time, source = {}, runtime) {
+  const t = Math.max(0, Number(time) || 0);
+  const { state } = runtime;
+  clearObject(state.parts);
+  Object.assign(state.parts, runtime.baseParts);
+  resetTransformChannels(runtime.transformChannels);
+
+  addPoseTransform(runtime.transformChannels, runtime.pose?.transform);
+  for (const track of runtime.motion?.tracks ?? []) addTrackTransform(runtime.transformChannels, track, t, snapshot.reducedMotion);
+  addGazeTransforms(runtime.transformChannels, pack.config.controllers.gaze, snapshot.gaze);
 
   const blink = pack.config.controllers.blink;
   if (blink && !snapshot.reducedMotion && isBlinkClosed(t, blink, pack.config.id)) {
-    Object.assign(parts, blink.closedParts ?? {});
+    Object.assign(state.parts, blink.closedParts ?? {});
   }
 
   const lipLevel = resolveLipLevel(source, t);
-  applyLipSync(parts, pack.config.controllers.lipSync, lipLevel);
-  applyMasterOverrides(parts, pack.config.assetModel.masterOverrides?.[master]);
-
-  return {
-    time: t,
-    expression: expressionName,
-    pose: poseName,
-    master,
-    parts,
-    effects: [...effects],
-    transforms: Object.fromEntries([...transforms].map(([id, value]) => [id, composeTransform(value)])),
-    lipLevel,
-  };
+  applyLipSync(state.parts, pack.config.controllers.lipSync, lipLevel);
+  applyMasterOverrides(state.parts, pack.config.assetModel.masterOverrides?.[runtime.master]);
+  clearObject(state.transforms);
+  for (const [id, value] of runtime.transformChannels) state.transforms[id] = composeTransform(value);
+  state.time = t;
+  state.expression = runtime.expressionName;
+  state.pose = runtime.poseName;
+  state.master = runtime.master;
+  state.effects = runtime.baseEffects;
+  state.lipLevel = lipLevel;
+  return state;
 }
 
 export function applyTimelineState(svg, pack, state, { transition = false } = {}) {
@@ -147,15 +177,23 @@ function addGazeTransforms(collection, gaze, value = {}) {
 
 function addComponent(collection, target, channel, value) {
   const targetState = collection.get(target) ?? {};
-  const current = targetState[channel] ?? { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
-  targetState[channel] = {
-    x: current.x + (value.x ?? 0),
-    y: current.y + (value.y ?? 0),
-    rotate: current.rotate + (value.rotate ?? 0),
-    scaleX: current.scaleX * (value.scaleX ?? 1),
-    scaleY: current.scaleY * (value.scaleY ?? 1),
-    origin: value.origin ?? current.origin,
-  };
+  const current = targetState[channel] ?? { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1, origin: null, active: false };
+  if (!current.active) {
+    current.x = 0;
+    current.y = 0;
+    current.rotate = 0;
+    current.scaleX = 1;
+    current.scaleY = 1;
+    current.origin = null;
+    current.active = true;
+  }
+  current.x += value.x ?? 0;
+  current.y += value.y ?? 0;
+  current.rotate += value.rotate ?? 0;
+  current.scaleX *= value.scaleX ?? 1;
+  current.scaleY *= value.scaleY ?? 1;
+  current.origin = value.origin ?? current.origin;
+  targetState[channel] = current;
   collection.set(target, targetState);
 }
 
@@ -163,7 +201,7 @@ function composeTransform(channels) {
   const result = { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1, origin: { x: 0, y: 0 } };
   for (const name of TRANSFORM_ORDER) {
     const item = channels[name];
-    if (!item) continue;
+    if (!item?.active) continue;
     result.x += item.x ?? 0;
     result.y += item.y ?? 0;
     result.rotate += item.rotate ?? 0;
@@ -227,3 +265,9 @@ function pseudoRandom(seed) {
 
 function round(value) { return Number(value || 0).toFixed(4); }
 function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
+function clearObject(value) { for (const key in value) delete value[key]; }
+function resetTransformChannels(collection) {
+  for (const target of collection.values()) {
+    for (const channel of Object.values(target)) channel.active = false;
+  }
+}

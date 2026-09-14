@@ -1,12 +1,25 @@
 # 最終QA結果
 
-最終更新: 2026-09-14
+最終更新: 2026-09-15
 
 ## 自動検証
 
-`PASS` — `npm run verify`: 22 tests / 22 passed / 0 failed / 0 skipped。共通 `verify.ps1` もProject verify PASS。Git statusは対象がGitリポジトリでないためSKIPPED。
+`PASS` — `npm run verify`: 27 tests / 27 passed / 0 failed / 0 skipped（2026-09-15、134.7ms）。既存22件にv2.0.3の5件を追加しました。
 
 確認範囲: 従来の16項目に加え、WebCodecsのalpha keep判定/configure/AlphaMode整合と非対応拒否、PSD初期visibilityとvisibleレイヤー由来composite、全sourceFilesのlossless round-trip、files宣言の必須化、JSONパス付きSVG ID typo拒否、v1 migration後の同一参照検証。
+
+## v2.0.3 Realtime Preview確認
+
+- `PASS` — mount時のSVG ID一括走査は1回。Realtime frame内はcache済みElement参照のみを使用
+- `PASS` — 同一stateを再適用した2 frame目はDOM updates 0、属性書込み増加0
+- `PASS` — expression変更時は選択が変わった目・口・effectだけを更新し、masterとgaze targetへ不要な書込みなし
+- `PASS` — tap、横方向の意図的drag、縦scrollを純粋関数で分類し、gaze座標をstage内の-1..1へclamp
+- `PASS` — メインの「＋ キャラクターを追加」は既存の単一 `pack-files` input、`importPackZip`、validator、IndexedDB保存へ接続
+- `PASS` — Service Worker cache keyとpackage versionがともに2.0.3。新規モジュールをprecacheし、activate時に旧cacheを削除
+- `PASS` — ローカル配信でindex、main、Realtime renderer、gaze helper、pilot JSON/SVG、Service WorkerのHTTP 200を確認
+- `SKIPPED（利用可能なBrowser Use接続なし）` — 実ブラウザの視覚・PointerEvent確認。Chrome headlessは起動終了コード0でしたがDOM出力を取得できず、成功扱いしていません
+
+FPS/frame timeの修正前後比較は、修正前ビルドを同一iPhone上で計測できないため `SKIPPED` です。代わりに `?debug-preview=1` で実機上のFPS、平均frame処理ms、DOM updates/frame、target FPSを表示できます。構造テストでは静止stateの2 frame目がDOM updates 0であることを固定しました。
 
 ## v2.0.2修正確認
 
@@ -37,6 +50,8 @@
 ## iPhone Safari実機QA
 
 `SKIPPED（接続実機なし）` — Windowsの接続デバイス一覧にiPhone/Apple Mobile Deviceがなく、実機Safariを操作できませんでした。iOS/Safari versionは取得不能です。デスクトップの幅320px対応CSS、safe-area、PWAファイル、自動テストはPASSですが、実機確認の代用とはしていません。
+
+v2.0.3で追加されたtap gaze、drag gaze、縦scroll非阻害、約30fps間引き、1分連続Preview、background→foreground後の性能についても、物理iPhone上の最終確認が必要です。
 
 - 初回/PWA起動、縦横画面、ホーム画面追加
 - 組込/ZIPキャラクター、表情、ポーズ、master切替と状態継承

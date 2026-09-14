@@ -27,3 +27,17 @@
 - motions、poses、expressions、controllers、masters/sharedParts/masterOverrides、psdLayersの全SVG ID参照をJSONパス付きで検証
 - `character.json.files` は宣言した全パスをpack内必須とし、optionalは宣言省略で表現
 - pilotサンプルは同梱していない `files.psd` 宣言を削除し、PSDは独立した書き出しサンプルとして配布
+
+## v2.0.3 Realtime Preview・モバイルUX修正
+
+- SVG mount時にIDを一括解決するRealtime専用DOM cacheを追加し、animation frame内の `querySelector` を廃止
+- visibility/transformの適用済み値を保持し、同じstateの再適用ではDOM更新を行わない差分更新へ変更
+- expression、pose、master、emoteを操作時だけ再準備し、frame loopはblink、lip sync、gaze、motionを中心に評価
+- Realtime state objectを再利用し、タッチ端末ではrAFを維持した30fps目標の更新間引きを追加。Offline Rendererは変更なし
+- 非選択master/slot/effectを `display: none` とし、巨大な不可視SVG partの描画を抑制
+- マウス追従に加え、タッチのtap gaze、横方向の意図的drag gaze、900ms後の中央復帰と滑らかな補間を追加
+- stageは `touch-action: pan-y pinch-zoom` とし、通常の縦スクロールとpinch zoomを維持
+- キャラクター選択欄へ常設の「＋ キャラクターを追加」を移動し、既存ZIP import/validator/IndexedDB経路へ接続
+- coarse pointer / hoverなし端末でbackdrop blurと大型shadowを軽減
+- `?debug-preview=1` にFPS、frame time、DOM updates/frame表示を追加
+- Service Worker cache revisionを `svg-character-studio-v2.0.3` へ更新し、旧cacheをactivation時に削除

@@ -77,8 +77,8 @@
     },
     "gaze": {
       "targets": ["iris_left", "iris_right"],
-      "maxX": 4,
-      "maxY": 3
+      "maxX": 7,
+      "maxY": 5
     }
   },
   "capabilities": {

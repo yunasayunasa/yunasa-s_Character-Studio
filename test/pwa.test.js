@@ -13,6 +13,11 @@ test("PWA manifest and icons are complete", async () => {
 
 test("service worker cache entries exist", async () => {
   const source = await readFile(new URL("sw.js", project), "utf8");
+  const packageJson = JSON.parse(await readFile(new URL("package.json", project), "utf8"));
+  assert.match(source, new RegExp(`svg-character-studio-v${packageJson.version.replaceAll(".", "\\.")}`));
+  assert.match(source, /caches\.keys\(\).*key !== CACHE/s);
+  assert.match(source, /src\/engine\/realtime-preview\.js/);
+  assert.match(source, /src\/engine\/gaze-input\.js/);
   assert(!source.includes(".js.js"));
   const paths = [...source.matchAll(/"(\.\/[^"`]+)"/g)].map((match) => match[1]);
   for (const path of paths) await stat(new URL(path, project));

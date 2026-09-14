@@ -18,6 +18,8 @@
 
 旧SVGは各表情を別ファイルとして生成し、顔の一部をマスクして目・眉・口を重ねる方式でした。Phase 1では元の `standing-vector.svg` を1つのマスター描画として埋め込み、差分に共通IDを付与した1つの `character.svg` に再構成しました。
 
+現行 `character.svg` は約992KB、1,829 path、7 use、2 clipPathを含むため、軽量な新規パックより描画負荷が高いlegacy / heavy sampleです。今回は見た目と既存互換性を守るため全面再描画せず、RealtimeエンジンのDOM cache、差分更新、不可視partの `display: none` で負荷を軽減しました。新規制作では必要部位だけの独立geometryを標準にします。
+
 移行した役割は次のとおりです。
 
 - 目: open / half / closed / smile
