@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Deployment smoke</title>
+<pre id="result">RUNNING</pre>
+<div id="host" hidden></div>
+<script type="module">
+const result = document.querySelector("#result");
+try {
+  const [{ loadCharacterManifest, loadCharacterPack }, { CharacterEngine }] = await Promise.all([
+    import("../src/engine/character-loader.js"),
+    import("../src/engine/character-engine.js"),
+  ]);
+  const manifest = await loadCharacterManifest("../public/characters/index.json");
+  const selected = manifest[0];
+  const pack = await loadCharacterPack(`../${selected.path.replace(/^\.\//, "")}`);
+  const host = document.querySelector("#host");
+  const engine = new CharacterEngine(host);
+  engine.mount(pack);
+  const mounted = Boolean(host.querySelector("#master_normal"));
+  engine.destroyCharacter();
+  if (!mounted) throw new Error("character SVG was not mounted");
+  result.textContent = `PASS id=${pack.config.id} schema=${pack.config.schemaVersion}`;
+} catch (error) {
+  result.textContent = `FAIL ${error.message}`;
+}
+</script>
