@@ -29,6 +29,7 @@ export function buildPreviewDomCache(svg, pack) {
 
 export class RealtimePreviewRenderer {
   constructor(svg, pack) {
+    this.backend = "legacy-svg";
     this.pack = pack;
     this.cache = buildPreviewDomCache(svg, pack);
     this.timeline = createTimelineRuntime();
@@ -59,7 +60,17 @@ export class RealtimePreviewRenderer {
       }
     }
     for (const [id, node] of this.cache.transforms) updates += setTransform(node, id, state.transforms[id], this.appliedTransforms);
-    return { state, updates, processingMs: performance.now() - startedAt };
+    return {
+      state,
+      updates,
+      processingMs: performance.now() - startedAt,
+      backend: this.backend,
+      cacheRebuilds: 0,
+      rasterizations: 0,
+      activeRasterLayers: 0,
+      cacheBytes: 0,
+      cacheEntries: 0,
+    };
   }
 }
 

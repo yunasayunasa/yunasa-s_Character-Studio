@@ -39,6 +39,10 @@ const elements = {
 };
 
 const engine = new CharacterEngine(elements.host);
+const query = new URLSearchParams(location.search);
+const backendPreference = query.get("preview-backend");
+if (["raster", "legacy-svg"].includes(backendPreference)) engine.previewPreference = backendPreference;
+engine.onPreviewStatus = (message) => { if (message) setStatus(message); };
 const audioLipSync = new AudioLipSync(elements.audioPlayer, (level) => engine.setAudioLevel(level));
 let subtitlePlaying = false;
 const subtitleLipSync = new SubtitleLipSync({
@@ -48,10 +52,14 @@ const subtitleLipSync = new SubtitleLipSync({
   onEnded: () => setSubtitlePlaying(false),
 });
 const exporter = new ExportManager(engine, updateExportProgress, presentDownload);
-if (new URLSearchParams(location.search).get("debug-preview") === "1") {
+if (query.get("debug-preview") === "1") {
   elements.previewDebug.hidden = false;
   engine.onPreviewMetrics = (metrics) => {
-    elements.previewDebug.value = `${metrics.fps.toFixed(1)}fps / ${metrics.frameMs.toFixed(2)}ms / DOM ${metrics.domUpdates.toFixed(1)} / target ${metrics.targetFps}`;
+    elements.previewDebug.value = [
+      `${metrics.fps.toFixed(1)}fps / ${metrics.frameMs.toFixed(2)}ms / DOM ${metrics.domUpdates.toFixed(1)} / target ${metrics.targetFps}`,
+      `${metrics.backend} / rebuild ${metrics.cacheRebuilds} / raster ${metrics.rasterizationsPerSecond.toFixed(1)}/s`,
+      `layers ${metrics.activeRasterLayers} / cache ${metrics.cacheEntries}・${formatBytes(metrics.cacheBytes)}`,
+    ].join("\n");
   };
 }
 let manifest = [];
@@ -191,7 +199,7 @@ async function selectCharacter(id) {
   if (!item) throw new Error(`キャラクター ${id} が見つかりません`);
   setStatus(`${item.label} を読み込み中…`);
   const pack = item.local ? await loadStoredPack(item.id) : await loadCharacterPack(item.path);
-  engine.mount(pack);
+  await engine.mount(pack);
   renderChoiceButtons(elements.expressionList, pack.expressions.expressions, pack.expressions.default, (name) => engine.setExpression(name));
   renderChoiceButtons(elements.poseList, pack.poses?.poses ?? {}, pack.poses?.default, (name) => engine.setPose(name));
   renderEmotes(pack.emotes);

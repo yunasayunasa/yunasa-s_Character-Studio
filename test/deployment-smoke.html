@@ -2,7 +2,7 @@
 <meta charset="utf-8">
 <title>Deployment smoke</title>
 <pre id="result">RUNNING</pre>
-<div id="host" hidden></div>
+<div id="host" style="position:absolute;left:-10000px;top:0;width:390px;height:520px"></div>
 <script type="module">
 const result = document.querySelector("#result");
 try {
@@ -15,11 +15,27 @@ try {
   const pack = await loadCharacterPack(`../${selected.path.replace(/^\.\//, "")}`);
   const host = document.querySelector("#host");
   const engine = new CharacterEngine(host);
-  engine.mount(pack);
-  const mounted = Boolean(host.querySelector("#master_normal"));
+  await engine.mount(pack);
+  engine.renderAt(1);
+  const mounted = Boolean(host.querySelector("canvas.raster-static-layer"));
+  const backend = engine.preview?.backend;
+  const initialRebuilds = engine.preview?.cache?.rebuildCount;
+  engine.setManualMouth(1);
+  engine.setGaze(1, -1);
+  engine.smoothGaze();
+  engine.renderAt(2);
+  engine.renderAt(3);
+  const dynamicRebuilds = engine.preview?.cache?.rebuildCount;
+  const staticWidth = engine.preview?.currentStatic?.canvas.width;
+  const partEntries = [...engine.preview.cache.partCache.entries.values()];
+  const cropped = partEntries.every((entry) => entry.canvas.width < staticWidth || entry.canvas.height < staticWidth);
+  const canvases = [engine.preview.currentStatic, ...partEntries].map((entry) => entry.canvas);
   engine.destroyCharacter();
-  if (!mounted) throw new Error("character SVG was not mounted");
-  result.textContent = `PASS id=${pack.config.id} schema=${pack.config.schemaVersion}`;
+  if (!mounted || backend !== "raster") throw new Error(`Raster Preview was not mounted (backend=${backend})`);
+  if (initialRebuilds !== 1 || dynamicRebuilds !== 1) throw new Error(`Dynamic state rebuilt static cache (${initialRebuilds} -> ${dynamicRebuilds})`);
+  if (!cropped) throw new Error("A dynamic part retained a full-size bitmap");
+  if (canvases.some((canvas) => canvas.width !== 0 || canvas.height !== 0)) throw new Error("Canvas cache was not disposed");
+  result.textContent = `PASS id=${pack.config.id} schema=${pack.config.schemaVersion} backend=${backend} rebuilds=${dynamicRebuilds} parts=${partEntries.length} cropped=true disposed=true`;
 } catch (error) {
   result.textContent = `FAIL ${error.message}`;
 }

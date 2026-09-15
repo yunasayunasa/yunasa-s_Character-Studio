@@ -1,4 +1,4 @@
-const CACHE = "svg-character-studio-v2.0.3";
+const CACHE = "svg-character-studio-v2.0.4";
 const CORE = [
   "./",
   "./index.html",
@@ -15,7 +15,10 @@ const CORE = [
   "./src/engine/gaze-input.js",
   "./src/engine/pack-schema.js",
   "./src/engine/pack-store.js",
+  "./src/engine/preview-backend.js",
   "./src/engine/psd-inspector.js",
+  "./src/engine/raster-cache.js",
+  "./src/engine/raster-preview.js",
   "./src/engine/realtime-preview.js",
   "./src/engine/subtitle-lip-sync.js",
   "./src/engine/timeline-state.js",

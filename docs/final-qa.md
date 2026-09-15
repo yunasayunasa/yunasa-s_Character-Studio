@@ -4,9 +4,24 @@
 
 ## 自動検証
 
-`PASS` — `npm run verify`: 27 tests / 27 passed / 0 failed / 0 skipped（2026-09-15、134.7ms）。既存22件にv2.0.3の5件を追加しました。
+`PASS` — `npm run verify`: 37 tests / 37 passed / 0 failed / 0 skipped（2026-09-15、168.1ms）。既存27件にv2.0.4の10件を追加しました。
 
 確認範囲: 従来の16項目に加え、WebCodecsのalpha keep判定/configure/AlphaMode整合と非対応拒否、PSD初期visibilityとvisibleレイヤー由来composite、全sourceFilesのlossless round-trip、files宣言の必須化、JSONパス付きSVG ID typo拒否、v1 migration後の同一参照検証。
+
+## v2.0.4 Realtime Raster Preview確認
+
+- `PASS` — 同一Static stateを120 frame要求してもRaster rebuildは1回
+- `PASS` — blink、mouth、gaze変更でStatic rebuildは増加しない
+- `PASS` — expression変更時だけ別Static keyを生成し、2件LRU内の既存stateへ戻る場合は再利用
+- `PASS` — Static最大2件、part最大32件のhard limit
+- `PASS` — character破棄時に全entryをdisposeし、破棄後に完了した非同期Rasterもcacheへ再登録しない
+- `PASS` — Raster初期化失敗時にLegacy SVG backendへfallback
+- `PASS` — Offline timelineのmaster、pose、parts、effects、lipLevel、transform値を固定期待値で確認
+- `PASS` — Service Worker cache keyとpackage versionがv2.0.4で一致し、新規Raster modulesをprecache
+- `PASS` — Chromium実ブラウザsmokeでpilotのbackend=`raster`、Static rebuild=1、dynamic part=4、全partがStatic全身未満へcrop
+- `PASS` — 同smokeで口・視線を更新してもrebuild=1を維持し、character破棄後に全Canvasが0×0
+
+Static Canvasと小part Canvasの生成は状態変更時だけです。安定frameの処理はCanvas visibilityとHTML/CSS transform更新で、SVG→Canvas変換はframe loopから呼ばれません。
 
 ## v2.0.3 Realtime Preview確認
 
@@ -52,6 +67,8 @@ FPS/frame timeの修正前後比較は、修正前ビルドを同一iPhone上で
 `SKIPPED（接続実機なし）` — Windowsの接続デバイス一覧にiPhone/Apple Mobile Deviceがなく、実機Safariを操作できませんでした。iOS/Safari versionは取得不能です。デスクトップの幅320px対応CSS、safe-area、PWAファイル、自動テストはPASSですが、実機確認の代用とはしていません。
 
 v2.0.3で追加されたtap gaze、drag gaze、縦scroll非阻害、約30fps間引き、1分連続Preview、background→foreground後の性能についても、物理iPhone上の最終確認が必要です。
+
+v2.0.4の実機性能目標（安定20fps以上、推奨27〜30fps）とidle 1分/5分の発熱比較は `SKIPPED（接続実機なし）` です。Chromium smokeやNode testをiPhone実測の代替とはしていません。`?debug-preview=1` でbackend、rebuild、rasterizations/s、active layers、cache bytesを含めてユーザー側で測定できます。
 
 - 初回/PWA起動、縦横画面、ホーム画面追加
 - 組込/ZIPキャラクター、表情、ポーズ、master切替と状態継承

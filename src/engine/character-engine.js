@@ -1,4 +1,4 @@
-import { RealtimePreviewRenderer } from "./realtime-preview.js";
+import { createPreviewBackend } from "./preview-backend.js";
 
 export class CharacterEngine {
   constructor(host) {
@@ -13,9 +13,23 @@ export class CharacterEngine {
     this.mobilePreview = matchMedia("(pointer: coarse), (hover: none)");
     this.previewInterval = 1000 / (this.mobilePreview.matches ? 30 : 60);
     this.gazeTarget = { x: 0, y: 0 };
-    this.previewMetrics = { fps: 0, frameMs: 0, domUpdates: 0, targetFps: Math.round(1000 / this.previewInterval) };
-    this.metricWindow = { startedAt: performance.now(), frames: 0, processingMs: 0, updates: 0 };
+    this.previewMetrics = {
+      fps: 0,
+      frameMs: 0,
+      domUpdates: 0,
+      targetFps: Math.round(1000 / this.previewInterval),
+      backend: "initializing",
+      cacheRebuilds: 0,
+      rasterizationsPerSecond: 0,
+      activeRasterLayers: 0,
+      cacheBytes: 0,
+      cacheEntries: 0,
+    };
+    this.metricWindow = { startedAt: performance.now(), frames: 0, processingMs: 0, updates: 0, rasterizations: 0 };
     this.onPreviewMetrics = null;
+    this.onPreviewStatus = null;
+    this.previewPreference = "auto";
+    this.mountGeneration = 0;
     this.snapshot = {
       expression: null,
       pose: null,
@@ -30,12 +44,11 @@ export class CharacterEngine {
     this.tick = this.tick.bind(this);
   }
 
-  mount(pack) {
+  async mount(pack) {
     this.destroyCharacter();
+    const generation = this.mountGeneration;
     this.pack = pack;
     this.svg = document.importNode(pack.svg, true);
-    this.host.replaceChildren(this.svg);
-    this.preview = new RealtimePreviewRenderer(this.svg, pack);
     this.snapshot.expression = pack.expressions.default;
     this.snapshot.pose = pack.poses?.default ?? null;
     this.snapshot.motion = pack.motions.default;
@@ -45,6 +58,28 @@ export class CharacterEngine {
     this.snapshot.gaze.y = 0;
     this.gazeTarget.x = 0;
     this.gazeTarget.y = 0;
+    this.onPreviewStatus?.("プレビューを準備中…");
+    let preview;
+    try {
+      preview = await createPreviewBackend({
+        svg: this.svg,
+        pack,
+        host: this.host,
+        snapshot: this.snapshot,
+        preference: this.previewPreference,
+        shouldContinue: () => generation === this.mountGeneration,
+      });
+    } catch (error) {
+      if (generation !== this.mountGeneration) return;
+      throw error;
+    }
+    if (generation !== this.mountGeneration) {
+      preview.destroy?.();
+      return;
+    }
+    this.preview = preview;
+    this.preview.onInvalidate = () => this.renderAt(this.elapsed());
+    this.previewMetrics.backend = preview.backend;
     this.previewInterval = 1000 / (this.mobilePreview.matches ? 30 : 60);
     this.previewMetrics.targetFps = Math.round(1000 / this.previewInterval);
     this.lastPreviewFrame = 0;
@@ -53,28 +88,29 @@ export class CharacterEngine {
     this.metricWindow.frames = 0;
     this.metricWindow.processingMs = 0;
     this.metricWindow.updates = 0;
-    this.renderAt(0, true);
+    this.metricWindow.rasterizations = 0;
+    this.renderAt(0);
     this.frame = requestAnimationFrame(this.tick);
   }
 
   setExpression(name) {
     if (!this.pack?.expressions.expressions[name]) return;
     this.snapshot.expression = name;
-    this.renderAt(this.elapsed(), true);
+    this.refreshStaticPreview(true);
   }
 
   setPose(name) {
     if (!this.pack?.poses?.poses[name]) return;
     this.snapshot.pose = name;
     this.snapshot.master = this.pack.poses.poses[name].master ?? this.snapshot.master;
-    this.renderAt(this.elapsed(), true);
+    this.refreshStaticPreview(true);
   }
 
   setEmote(name) {
     const emote = this.pack?.emotes?.emotes[name];
     if (!emote) return;
     this.snapshot.emoteVisible = [...(emote.visible ?? [])];
-    this.renderAt(this.elapsed(), true);
+    this.refreshStaticPreview(false);
   }
 
   setManualMouth(value) { this.lip.manualLevel = clamp(Number(value) || 0, 0, 1); }
@@ -85,6 +121,7 @@ export class CharacterEngine {
 
   setRunning(running) {
     this.running = Boolean(running);
+    this.preview?.setRunning?.(this.running);
     if (!this.running) this.renderAt(0);
     else this.startedAt = performance.now();
   }
@@ -99,7 +136,7 @@ export class CharacterEngine {
     this.frame = requestAnimationFrame(this.tick);
   }
 
-  renderAt(time, staticChanged = false) {
+  renderAt(time) {
     if (!this.pack || !this.svg || !this.preview) return;
     this.snapshot.reducedMotion = this.reducedMotion.matches;
     const level = this.lip.mode === "manual"
@@ -109,9 +146,40 @@ export class CharacterEngine {
         : this.lip.mode === "subtitle"
           ? this.lip.subtitleLevel
           : Math.max(this.lip.audioLevel, this.lip.subtitleLevel * 0.7);
-    if (staticChanged) this.preview.prepareStatic(this.snapshot);
     const result = this.preview.render(this.snapshot, time, { level });
     this.recordMetrics(result);
+  }
+
+  refreshStaticPreview(rebuildBase) {
+    const preview = this.preview;
+    if (!preview) return;
+    const pending = preview.prepareStatic(this.snapshot, { rebuildBase });
+    if (!pending?.then) return this.renderAt(this.elapsed());
+    if (rebuildBase) this.onPreviewStatus?.("プレビューを準備中…");
+    pending.then(() => {
+      if (this.preview !== preview) return;
+      this.renderAt(this.elapsed());
+      this.onPreviewStatus?.(null);
+    }).catch((error) => this.fallbackToLegacy(preview, error));
+  }
+
+  fallbackToLegacy(failedPreview, error) {
+    if (this.preview !== failedPreview || !this.pack) return;
+    console.warn("Raster Preview更新に失敗したためLegacy SVGへ切り替えます", error);
+    failedPreview.destroy?.();
+    this.host.replaceChildren(this.svg);
+    createPreviewBackend({
+      svg: this.svg,
+      pack: this.pack,
+      host: this.host,
+      snapshot: this.snapshot,
+      preference: "legacy-svg",
+    }).then((preview) => {
+      this.preview = preview;
+      this.previewMetrics.backend = preview.backend;
+      this.renderAt(this.elapsed());
+      this.onPreviewStatus?.("Raster Cacheを利用できないためLegacy SVGで表示しています");
+    }).catch((fallbackError) => this.onPreviewStatus?.(fallbackError.message));
   }
 
   smoothGaze() {
@@ -130,11 +198,18 @@ export class CharacterEngine {
     this.previewMetrics.fps = this.metricWindow.frames * 1000 / duration;
     this.previewMetrics.frameMs = this.metricWindow.processingMs / this.metricWindow.frames;
     this.previewMetrics.domUpdates = this.metricWindow.updates / this.metricWindow.frames;
+    this.previewMetrics.backend = result.backend;
+    this.previewMetrics.cacheRebuilds = result.cacheRebuilds;
+    this.previewMetrics.rasterizationsPerSecond = Math.max(0, result.rasterizations - this.metricWindow.rasterizations) * 1000 / duration;
+    this.previewMetrics.activeRasterLayers = result.activeRasterLayers;
+    this.previewMetrics.cacheBytes = result.cacheBytes;
+    this.previewMetrics.cacheEntries = result.cacheEntries;
     this.onPreviewMetrics?.(this.previewMetrics);
     this.metricWindow.startedAt = now;
     this.metricWindow.frames = 0;
     this.metricWindow.processingMs = 0;
     this.metricWindow.updates = 0;
+    this.metricWindow.rasterizations = result.rasterizations;
   }
 
   elapsed() { return Math.max(0, (performance.now() - this.startedAt) / 1000); }
@@ -155,8 +230,10 @@ export class CharacterEngine {
   }
 
   destroyCharacter() {
+    this.mountGeneration += 1;
     if (this.frame) cancelAnimationFrame(this.frame);
     this.frame = null;
+    this.preview?.destroy?.();
     this.preview = null;
     this.host.replaceChildren();
   }

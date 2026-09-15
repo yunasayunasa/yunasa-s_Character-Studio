@@ -41,3 +41,16 @@
 - coarse pointer / hoverなし端末でbackdrop blurと大型shadowを軽減
 - `?debug-preview=1` にFPS、frame time、DOM updates/frame表示を追加
 - Service Worker cache revisionを `svg-character-studio-v2.0.3` へ更新し、旧cacheをactivation時に削除
+
+## v2.0.4 Realtime Raster Preview
+
+- Realtime Previewだけを、複雑な生SVG DOMからStatic Canvas＋crop済みDynamic Part Canvasへ変更
+- master/body/固定partはmaster・pose・expression変更時だけRaster Cacheを更新
+- blink、lip sync、gaze、effect、独立hair motionは小Canvasのvisibility/CSS transformだけを更新
+- masterを包含する全身motion targetを入れ子のHTML wrapperへ移し、`translate3d / rotate / scale`でcompositing
+- 小partはbbox cropし、clip付き巨大useはalpha範囲を検出して保持前にcrop。一時full canvasは直後に解放
+- Static最大2件、part最大32件のLRU、並行生成集約、character切替時generation無効化・Canvas破棄を追加
+- background中はrAFに加えてpart prewarmも停止
+- Raster初期化失敗時はv2.0.3 Legacy SVG Previewへ自動fallback
+- debug metricsへbackend、cache rebuild、rasterizations/s、active layers、cache entry/bytesを追加
+- Service Worker cache revisionを `svg-character-studio-v2.0.4` へ更新

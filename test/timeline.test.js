@@ -43,6 +43,29 @@ test("pose and motion transforms are composed, while master keeps expression and
   assert.match(state.transforms.root, /translate\(7\.0000 0\.0000\)/);
 });
 
+test("offline renderer state contract remains exact after the preview backend change", () => {
+  const state = createTimelineState(pack, { expression: "happy", pose: "point", gaze: { x: 0.5, y: -0.5 }, emoteVisible: [] }, 0.25, { level: 0.8 });
+  assert.deepEqual({
+    time: state.time,
+    expression: state.expression,
+    pose: state.pose,
+    master: state.master,
+    parts: state.parts,
+    effects: state.effects,
+    lipLevel: state.lipLevel,
+  }, {
+    time: 0.25,
+    expression: "happy",
+    pose: "point",
+    master: "point",
+    parts: { eyes: "eyes_open", mouth: "mouth_wide", pose: "pose_point" },
+    effects: ["blush"],
+    lipLevel: 0.8,
+  });
+  assert.match(state.transforms.root, /translate\(7\.0000 0\.0000\)/);
+  assert.match(state.transforms.eyes_open, /translate\(2\.0000 -1\.5000\)/);
+});
+
 test("audio envelope interpolation and audio duration segmentation are exact", () => {
   const envelope = { sampleRate: 2, levels: Float32Array.from([0, 1, 0]), duration: 1.5 };
   assert.equal(envelopeLevelAt(envelope, 0.25), 0.5);

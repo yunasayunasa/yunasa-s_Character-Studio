@@ -1,5 +1,7 @@
 # Realtime Preview・モバイル入力設計
 
+> v2.0.4では、このv2.0.3 SVG DOM rendererをfallbackとして維持し、通常は[Realtime Raster Cache設計](./raster-preview-design.md)を使用します。
+
 ## Offline Rendererとの境界
 
 `createTimelineState()` は、任意時刻と同じ入力から同じ状態を返すオフライン書き出し用APIとして維持します。GIF、WebM、字幕区間、音声エンベロープの評価は従来どおりこの経路を使います。

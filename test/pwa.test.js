@@ -18,6 +18,9 @@ test("service worker cache entries exist", async () => {
   assert.match(source, /caches\.keys\(\).*key !== CACHE/s);
   assert.match(source, /src\/engine\/realtime-preview\.js/);
   assert.match(source, /src\/engine\/gaze-input\.js/);
+  assert.match(source, /src\/engine\/raster-cache\.js/);
+  assert.match(source, /src\/engine\/raster-preview\.js/);
+  assert.match(source, /src\/engine\/preview-backend\.js/);
   assert(!source.includes(".js.js"));
   const paths = [...source.matchAll(/"(\.\/[^"`]+)"/g)].map((match) => match[1]);
   for (const path of paths) await stat(new URL(path, project));
