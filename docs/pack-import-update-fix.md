@@ -49,7 +49,11 @@ Raster Preview描画アルゴリズム、CharacterEngine、Offline Renderer、�
 
 `release/silver-scholar-hybrid-pack.zip` は修正不要。同じZIPを新アプリで検証した。SHA256 `4d0261d9fabc1a2128cd4bb2bda5a0efead8fbcfe3c98d7a2084cc84bc9a8e73`。
 
-コード修正はローカルで検証済み。公開サイトへのcommit/push/deployは未実施。Git運用ルールに従い、ユーザーの指示前に行わない。公開時は新ローダーとSW版を同時に反映し、アプリを再読み込みして新SWをactivation後、もう一度reloadする。既存IDBのraw SVGにRasterが残っているので再importなしでも再表示できる。
+ユーザー承認後、commit `1a1b3e3` をmainへ通常pushし、[GitHub Pagesデプロイ](https://github.com/yunasayunasa/yunasa-s_Character-Studio/actions/runs/35116696827)の成功を確認した。公開URLで通常UIの配布ZIP import・更新・cancel・IndexedDB reloadと、実Service Worker経由のreloadを17/17 PASS、ページエラー0件で確認した。公開配信ローダーの埋め込みRaster対応、importer更新対応、SW cache 2.0.5も確認済み。
+
+公開時は新ローダーとSW版を同時に反映する。古いアプリが表示される端末では、再読み込みして新SWをactivation後、もう一度reloadする。既存IDBのraw SVGにRasterが残っているので再importなしでも再表示できる。公開検証結果と画像は `pack-import-evidence/public/result.json`、`hybrid-after-reload.png` に保存。
+
+公開対象だけを既存HEADへ重ねた候補でも通常UI 16/16、project verify 39/39 PASS、ステージ13ファイルの秘密スキャン0件。既存の未コミットRaster Preview・timeline・美術素材・manifest変更は公開commitへ含めていない。
 
 共通verifyの秘密スキャンには、既存赤鬼JPEGのBase64がcase-insensitive AKIAパターンに当たる4件の既知FAILが残る。対象画像や検査を変更して回避しない。依存追加なし。機能PASSを共通ゲート全PASSと表記しない。
 
