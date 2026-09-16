@@ -11,6 +11,17 @@
 
 * { box-sizing: border-box; }
 
+#pack-update-dialog {
+  max-width: min(32rem, calc(100vw - 2rem));
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background: #1d1f29;
+  color: #f6f1e8;
+}
+#pack-update-dialog::backdrop { background: rgb(0 0 0 / 65%); }
+#pack-update-dialog h2 { font-size: 1.2rem; }
+
 html, body { min-height: 100%; margin: 0; }
 
 body {

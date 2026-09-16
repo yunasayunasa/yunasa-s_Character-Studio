@@ -67,7 +67,7 @@ export function parseSafeSvg(text) {
       const name = attribute.name.toLowerCase();
       const value = attribute.value.trim();
       if (name.startsWith("on")) element.removeAttribute(attribute.name);
-      if ((name === "href" || name.endsWith(":href")) && value && !value.startsWith("#")) {
+      if ((name === "href" || name.endsWith(":href")) && value && !value.startsWith("#") && !isEmbeddedRaster(element.localName, value)) {
         element.removeAttribute(attribute.name);
       }
       if (/url\((?!["']?#)/i.test(value)) element.removeAttribute(attribute.name);
@@ -77,6 +77,17 @@ export function parseSafeSvg(text) {
   svg.setAttribute("height", "100%");
   svg.setAttribute("focusable", "false");
   return svg;
+}
+
+// Self-contained raster payloads only; SVG/data documents and remote URLs remain forbidden.
+export function isEmbeddedRaster(tag, value) {
+  if (tag !== "image") return false;
+  const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match || match[2].length % 4 || match[2].length > 24 * 1024 * 1024) return false;
+  const bytes = atob(match[2].slice(0, 24));
+  if (match[1] === "png") return bytes.startsWith("\x89PNG\r\n\x1a\n");
+  if (match[1] === "jpeg") return bytes.startsWith("\xff\xd8\xff");
+  return bytes.startsWith("RIFF") && bytes.slice(8, 12) === "WEBP";
 }
 
 function assertSvgParts(svg, config, expressions, motions, poses, emotes) {

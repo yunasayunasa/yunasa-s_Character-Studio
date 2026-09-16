@@ -143,6 +143,17 @@
 
     <div id="subtitle-overlay" class="subtitle-overlay" aria-live="polite"></div>
 
+    <dialog id="pack-update-dialog" aria-labelledby="pack-update-title">
+      <form method="dialog">
+        <h2 id="pack-update-title">このキャラクターは既に登録されています</h2>
+        <p>キャラクター: <strong id="pack-update-name"></strong></p>
+        <p>現在のversion: <span id="pack-update-current"></span></p>
+        <p>読み込みversion: <span id="pack-update-incoming"></span></p>
+        <p>更新すると、保存済みのPack素材を読み込んだPackで置き換えます。</p>
+        <button id="pack-update-confirm" value="update" type="submit">更新する</button>
+        <button id="pack-update-cancel" value="cancel" type="submit" autofocus>キャンセル</button>
+      </form>
+    </dialog>
     <script type="module" src="./src/main.js"></script>
   </body>
 </html>

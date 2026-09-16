@@ -63,7 +63,7 @@ test("main character add button reuses the existing pack import input", async ()
   assert.match(html, /for="pack-files"[^>]*>＋ キャラクターを追加/);
   assert.equal((html.match(/id="pack-files"/g) ?? []).length, 1);
   assert.match(main, /elements\.packFiles\.addEventListener\("change"/);
-  assert.match(main, /importPackZip\(single\)/);
+  assert.match(main, /importPackZip\(single, \{ confirmUpdate: confirmPackUpdate \}\)/);
   assert.match(css, /touch-action:\s*pan-y pinch-zoom/);
   assert.doesNotMatch(css, /(?:html|body|\.app-shell)\s*\{[^}]*touch-action:\s*none/s);
 });

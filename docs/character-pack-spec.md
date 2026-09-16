@@ -16,6 +16,17 @@ master artwork
 
 ## ZIP構成
 
+### 同じキャラクターの更新
+
+`character.json.id` が既存の安定IDです。表示名 `label` と独立させ、Pack更新で変更しません。新しい `characterId` やversion管理schemaは追加しません。schemaVersion 1のLegacy Packも従来の `id` のままimportできます。
+
+端末保存済みの同じIDを再importすると、更新確認ダイアログが表示されます。「更新する」で新Packを正としてレコード全体（JSON、SVG、Rasterを含むsourceFiles・auxiliaryFiles、metadata）を置換します。旧Packにしかない素材は残りません。「キャンセル」では保存内容を変更しません。表示名が同じでもIDが異なる場合は別キャラクターです。
+
+Studioの音声・字幕・出力品質・手動口パク値・再生設定はPack外として維持します。選択中キャラクターを更新した場合、引き続き存在する表情・ポーズ・emote選択を維持し、削除された選択は新Packのdefaultへ戻します。Previewは再mountされ、新素材でキャッシュを再構築します。`config.version` があれば確認UIに表示し、なければ「記載なし」と表示します。
+
+APIの `importPackZip(file, { confirmUpdate })` / `importPackFiles(files, { confirmUpdate })` は、同じIDが保存済みの時だけ `confirmUpdate(current, incoming)` を呼びます。戻り値が厳密に `true` の時だけ置換し、未指定またはキャンセル時は `null` を返して保存しません。検証と任意PSD検査は確認より先に完了し、保存完了はIndexedDB transaction完了時に確定します。
+
+
 ```text
 character-name/
 ├─ character.svg          必須
@@ -85,6 +96,15 @@ PSDで背景皮膚などを別レイヤーにする場合も `eye_left_base` の
 `partSlots` は同時に1つだけ表示するID集合、`effectParts` は重ねて表示できるID集合です。`psdLayers` は `{ "name": "eye_left_open", "partId": "eye_left_open" }` とし、nameとpartIdを一致させます。
 
 ## lossless round-trip
+
+### 埋め込みラスター
+
+`<image href="data:image/jpeg;base64,...">`（PNG / JPEG / WebP）を使用できます。
+許可はimage要素だけに限定し、base64構文・形式のシグネチャ・24MiB以下のbase64文字数を検査します。
+デコード成功・寸法は実際のブラウザ描画でも確認してください。外部URLやSVG形式のdata URLは許可しません。
+ラスターをSVG自身へ埋め込めば、通常のZIP sourceFiles保持で素材も同じバイト列のまま往復できます。
+`data-export-part` と `psdLayers` は従来と同じです。defs内の素材をuseで共有する場合も、描画する各partを明示してください。
+
 
 ZIP import時は、ランタイム用に解析したJSON/SVGとは別に、packルート以下の全正当ファイルを元の相対パスとバイト列のまま `sourceFiles` としてIndexedDBへ保存します。pack ZIP再export時はこの `sourceFiles` を使用するため、PSD、thumbnail、`masters/`、`shared_parts/`、ライセンス等の未知の補助ファイルも欠落・再整形しません。旧保存レコードに `sourceFiles` がない場合だけ、従来のランタイムデータ＋`auxiliaryFiles`再構成へフォールバックします。
 

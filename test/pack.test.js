@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
+import { isEmbeddedRaster } from "../src/engine/character-loader.js";
 import {
   assertCharacterConfig,
   assertEmotes,
@@ -49,8 +50,12 @@ test("all packs have valid JSON and required SVG ids", async () => {
     }
     if (config.id === "pilot-standing") assert.equal(config.psdLayers.length, 34, "pilot PSD must retain all 34 editable part layers");
     for (const idsInSlot of Object.values(config.assetModel.sharedParts)) for (const id of idsInSlot) assert(ids.has(id), `${config.id}: shared part ${id} is missing`);
-    assert(!/<(?:script|foreignObject|style|image)\b/i.test(svg), `${config.id}: unsafe or raster element found`);
-    assert(!/\b(?:href|xlink:href)="(?!#)/i.test(svg), `${config.id}: external SVG reference found`);
+    assert(!/<(?:script|foreignObject|style)\b/i.test(svg), `${config.id}: unsafe element found`);
+    for (const tag of svg.matchAll(/<([\w:]+)\b([^>]*)>/g)) {
+      for (const reference of tag[2].matchAll(/\b(?:href|xlink:href)="([^"]*)"/g)) {
+        assert(reference[1].startsWith("#") || isEmbeddedRaster(tag[1], reference[1]), `${config.id}: unsafe SVG reference on ${tag[1]}`);
+      }
+    }
   }
 });
 

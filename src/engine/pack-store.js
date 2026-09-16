@@ -6,7 +6,7 @@ import { findPackRoot, readZipFile } from "./zip-reader.js";
 const DATABASE = "svg-character-studio";
 const STORE = "character-packs";
 
-export async function importPackFiles(fileList) {
+export async function importPackFiles(fileList, options = {}) {
   const files = new Map([...fileList].map((file) => [file.name, file]));
   const characterFile = files.get("character.json");
   if (!characterFile) throw new Error("character.json を選択してください");
@@ -32,11 +32,10 @@ export async function importPackFiles(fileList) {
   };
   const pack = loadCharacterPackData({ ...record, baseUrl: `indexeddb:${record.id}` });
   validateOptionalPsd(new Map(record.sourceFiles.map((item) => [item.path, item.data])), "", config, pack);
-  await put(record);
-  return record;
+  return saveImportedPack(record, options);
 }
 
-export async function importPackZip(file) {
+export async function importPackZip(file, options = {}) {
   if (!file?.name?.toLowerCase().endsWith(".zip")) throw new Error("character-name.zip を選択してください");
   const files = await readZipFile(file);
   const root = findPackRoot(files);
@@ -44,8 +43,7 @@ export async function importPackZip(file) {
   const { config } = record;
   const pack = loadCharacterPackData({ ...record, baseUrl: `indexeddb:${record.id}` });
   validateOptionalPsd(files, root, config, pack);
-  await put(record);
-  return record;
+  return saveImportedPack(record, options);
 }
 
 export function decodePackEntries(files, root = "") {
@@ -108,6 +106,16 @@ function put(record) {
   return openDatabase().then((database) => transactionResult(database, "readwrite", (store) => store.put(record)));
 }
 
+// config.id is the existing stable Pack identity, never the display label.
+// No write (including source assets) occurs until the caller confirms replacement.
+async function saveImportedPack(record, { confirmUpdate } = {}) {
+  const database = await openDatabase();
+  const current = await transactionResult(database, "readonly", (store) => store.get(record.id));
+  if (current && (!confirmUpdate || await confirmUpdate(current, record) !== true)) return null;
+  await put(record); // Whole-record replacement removes all old-only Pack assets.
+  return record;
+}
+
 function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 1);
@@ -121,9 +129,11 @@ function transactionResult(database, mode, operation) {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE, mode);
     const request = operation(transaction.objectStore(STORE));
-    request.onsuccess = () => resolve(request.result);
+    let result;
+    request.onsuccess = () => { result = request.result; };
     request.onerror = () => reject(request.error);
-    transaction.oncomplete = () => database.close();
+    transaction.oncomplete = () => { database.close(); resolve(result); };
+    transaction.onabort = transaction.onerror = () => { database.close(); reject(transaction.error ?? request.error ?? new Error("パックの保存処理に失敗しました")); };
   });
 }
 

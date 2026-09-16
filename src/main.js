@@ -145,10 +145,12 @@ function bindUi() {
       setStatus("キャラクターパックを検証しています…");
       const [single] = elements.packFiles.files;
       const record = elements.packFiles.files.length === 1 && single.name.toLowerCase().endsWith(".zip")
-        ? await importPackZip(single)
-        : await importPackFiles(elements.packFiles.files);
+        ? await importPackZip(single, { confirmUpdate: confirmPackUpdate })
+        : await importPackFiles(elements.packFiles.files, { confirmUpdate: confirmPackUpdate });
+      if (!record) { setStatus("キャラクターパックの更新をキャンセルしました"); return; }
+      const selection = engine.pack?.config.id === record.id ? { ...engine.snapshot } : null;
       await refreshManifest();
-      await selectCharacter(record.id);
+      await selectCharacter(record.id, selection);
       setStatus(`${record.label} を端末へ保存しました`);
     } catch (error) {
       showError(error);
@@ -194,21 +196,38 @@ async function refreshManifest() {
   elements.characterSelect.replaceChildren(...manifest.map(characterOption));
 }
 
-async function selectCharacter(id) {
+async function selectCharacter(id, previous = null) {
   const item = manifest.find((entry) => entry.id === id);
   if (!item) throw new Error(`キャラクター ${id} が見つかりません`);
   setStatus(`${item.label} を読み込み中…`);
   const pack = item.local ? await loadStoredPack(item.id) : await loadCharacterPack(item.path);
   await engine.mount(pack);
-  renderChoiceButtons(elements.expressionList, pack.expressions.expressions, pack.expressions.default, (name) => engine.setExpression(name));
-  renderChoiceButtons(elements.poseList, pack.poses?.poses ?? {}, pack.poses?.default, (name) => engine.setPose(name));
-  renderEmotes(pack.emotes);
-  if (pack.poses) engine.setPose(pack.poses.default);
-  if (pack.emotes) engine.setEmote(pack.emotes.default);
+  const expression = pack.expressions.expressions[previous?.expression] ? previous.expression : pack.expressions.default;
+  const pose = pack.poses?.poses[previous?.pose] ? previous.pose : pack.poses?.default;
+  engine.setExpression(expression);
+  renderChoiceButtons(elements.expressionList, pack.expressions.expressions, expression, (name) => engine.setExpression(name));
+  renderChoiceButtons(elements.poseList, pack.poses?.poses ?? {}, pose, (name) => engine.setPose(name));
+  const emote = pack.emotes?.emotes[elements.emoteSelect.value] && previous ? elements.emoteSelect.value : pack.emotes?.default;
+  renderEmotes(pack.emotes, emote);
+  if (pack.poses) engine.setPose(pose);
+  if (pack.emotes) engine.setEmote(emote);
   elements.characterSelect.value = id;
   elements.deletePack.disabled = !item.local;
   setStatus(`${pack.config.label} を表示しています`);
   updateExportEstimate();
+}
+
+function confirmPackUpdate(current, incoming) {
+  const dialog = document.querySelector("#pack-update-dialog");
+  document.querySelector("#pack-update-name").textContent = incoming.label;
+  for (const [selector, record] of [["#pack-update-current", current], ["#pack-update-incoming", incoming]]) {
+    document.querySelector(selector).textContent = record.config.version ?? "記載なし";
+  }
+  return new Promise((resolve) => {
+    dialog.returnValue = "cancel";
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "update"), { once: true });
+    dialog.showModal();
+  });
 }
 
 function renderChoiceButtons(host, choices, selected, onSelect) {
@@ -228,7 +247,7 @@ function renderChoiceButtons(host, choices, selected, onSelect) {
   host.closest("fieldset").hidden = buttons.length === 0;
 }
 
-function renderEmotes(data) {
+function renderEmotes(data, selected = data?.default) {
   const choices = data?.emotes ?? { none: { label: "なし" } };
   elements.emoteSelect.replaceChildren(...Object.entries(choices).map(([name, emote]) => {
     const option = document.createElement("option");
@@ -236,7 +255,7 @@ function renderEmotes(data) {
     option.textContent = emote.label ?? name;
     return option;
   }));
-  elements.emoteSelect.value = data?.default ?? "none";
+  elements.emoteSelect.value = selected ?? "none";
 }
 
 function setLipMode(mode) {
