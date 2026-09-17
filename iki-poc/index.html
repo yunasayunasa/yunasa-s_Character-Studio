@@ -10,7 +10,7 @@
 </head>
 <body><main><div class="card">
 <div class="stage"><canvas id="canvas" width="720" height="720"></canvas></div>
-<div class="badge">Iki Runtime / actual mesh + warp2d</div>
+<div class="badge">Iki Runtime / official v1 mesh + warp2d</div>
 <div class="buttons">
 <button id="idle" class="active">自動まばたき・呼吸 ON</button>
 <button id="turn">自動左右</button><button id="talk">口パク</button><button id="blink">まばたき</button><button id="reset">リセット</button>
@@ -25,21 +25,121 @@
 <div class="control"><label>眉 <span id="vBrow">0</span></label><input id="brow" type="range" min="-1" max="1" step="0.05" value="0"></div>
 </div>
 <div id="status" class="status">Iki Runtime を準備中…</div>
-<div class="note">gzip経路を完全に廃止し、.iki JSONを直接読み込みます。Angle X / Y はメッシュ＋warp2dを動かします。</div>
+<div class="note">旧PoCデータをブラウザ内で公式Iki v1スキーマへ変換してから検証・再生します。Angle X / Y はwarp2dグリッドを動かします。</div>
 </div></main>
 <script type="module">
 const status=document.getElementById('status');
 const fail=(stage,e,extra='')=>{console.error(stage,e);status.textContent='起動エラー ['+stage+']: '+(e?.message||String(e))+(extra?'\n'+extra:'');};
+
+function flatPairs(a){
+  if(!Array.isArray(a)) return [];
+  return Array.isArray(a[0]) ? a.flat() : a.slice();
+}
+function legacyPartToV1(p){
+  const rawVertices=flatPairs(p.mesh?.vertices);
+  const sourceVerts=rawVertices.length>=6?rawVertices:[-0.5,-0.5,0.5,-0.5,0.5,0.5,-0.5,0.5];
+  const xs=[],ys=[];
+  for(let i=0;i<sourceVerts.length;i+=2){xs.push(+sourceVerts[i]);ys.push(+sourceVerts[i+1]);}
+  const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+  const width=Math.max(1,maxX-minX),height=Math.max(1,maxY-minY);
+  const cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+  const vertices=[];
+  for(let i=0;i<sourceVerts.length;i+=2){vertices.push((sourceVerts[i]-cx)/width,(sourceVerts[i+1]-cy)/height);}
+  let uvs=flatPairs(p.mesh?.uvs);
+  if(uvs.length!==vertices.length){
+    if(vertices.length===8) uvs=[0,1,1,1,1,0,0,0];
+    else {
+      uvs=[];
+      for(let i=0;i<sourceVerts.length;i+=2){uvs.push((sourceVerts[i]-minX)/width,1-(sourceVerts[i+1]-minY)/height);}
+    }
+  }
+  const indices=(p.mesh?.indices||p.mesh?.triangles||[0,1,2,0,2,3]).slice();
+  const bindings=[];
+  if(p.id==='body') bindings.push({parameter:'ParamBreath',channel:'scaleY',from:-0.006,to:0.006});
+  if(p.id==='head') bindings.push({parameter:'ParamBreath',channel:'translateY',from:-2,to:2});
+  if(p.id==='eye_L') bindings.push({parameter:'ParamEyeLOpen',channel:'opacity',from:0,to:1});
+  if(p.id==='eye_R') bindings.push({parameter:'ParamEyeROpen',channel:'opacity',from:0,to:1});
+  if(p.id==='iris_L') bindings.push(
+    {parameter:'ParamEyeLOpen',channel:'opacity',from:0,to:1},
+    {parameter:'ParamEyeBallX',channel:'translateX',from:-6,to:6},
+    {parameter:'ParamEyeBallY',channel:'translateY',from:-3,to:3}
+  );
+  if(p.id==='iris_R') bindings.push(
+    {parameter:'ParamEyeROpen',channel:'opacity',from:0,to:1},
+    {parameter:'ParamEyeBallX',channel:'translateX',from:-6,to:6},
+    {parameter:'ParamEyeBallY',channel:'translateY',from:-3,to:3}
+  );
+  if(p.id==='eye_L_closed') bindings.push({parameter:'ParamEyeLOpen',channel:'opacity',from:1,to:0});
+  if(p.id==='eye_R_closed') bindings.push({parameter:'ParamEyeROpen',channel:'opacity',from:1,to:0});
+  if(p.id==='brow_L') bindings.push({parameter:'ParamBrowLY',channel:'translateY',from:-5,to:5});
+  if(p.id==='brow_R') bindings.push({parameter:'ParamBrowRY',channel:'translateY',from:-5,to:5});
+  if(p.id==='mouth') bindings.push({parameter:'ParamMouthOpenY',channel:'opacity',from:1,to:0});
+  if(p.id==='mouth_open') bindings.push({parameter:'ParamMouthOpenY',channel:'opacity',from:0,to:1});
+  const t=p.transform||{};
+  const textureIndex=typeof p.texture==='number'?p.texture:(p.texture?.index??0);
+  return {
+    id:p.id,
+    color:[1,1,1,1],
+    width,
+    height,
+    transform:{x:(t.x||0)+cx,y:(t.y||0)+cy,rotation:t.rotation||0,scaleX:t.scaleX??1,scaleY:t.scaleY??1,opacity:1},
+    order:p.drawOrder??p.order??0,
+    ...(bindings.length?{bindings}:{}),
+    texture:{index:textureIndex,uv:{x:0,y:0,width:1,height:1}},
+    ...(p.deformer?{deformer:p.deformer}:{}),
+    mesh:{vertices,uvs,indices}
+  };
+}
+function buildV1Deformers(){
+  const xs=[-320,0,320],ys=[500,200,-100];
+  const points=[];
+  for(const y of ys) for(const x of xs) points.push(x,y);
+  const values=[-30,0,30];
+  const keyforms2d=[];
+  for(const ay of values){
+    for(const ax of values){
+      const nx=ax/30,ny=ay/30,offsets=[];
+      for(const y of ys){
+        for(const x of xs){
+          const xn=x/320,yn=(y-200)/300;
+          const dx=nx*(20-16*xn)+ny*4*xn;
+          const dy=ny*(18-5*Math.abs(xn))+nx*4*xn+nx*2*yn;
+          offsets.push(dx,dy);
+        }
+      }
+      keyforms2d.push({offsets});
+    }
+  }
+  return [
+    {id:'headDeformer',pivot:{x:0,y:200},transform:{x:0,y:0,rotation:0,scaleX:1,scaleY:1},bindings:[{parameter:'ParamAngleZ',channel:'rotate',from:-8,to:8}]},
+    {kind:'warp',id:'faceWarp',parent:'headDeformer',grid:{cols:2,rows:2,points},warp2d:{parameter:'ParamAngleX',parameterY:'ParamAngleY',valuesX:values,valuesY:values,keyforms2d}}
+  ];
+}
+function migrateLegacyModel(raw){
+  if(!raw||!Array.isArray(raw.parts)||!Array.isArray(raw.textures)) throw new Error('旧モデルのparts/texturesが見つかりません');
+  return {
+    version:1,
+    name:raw.name||'Red Oni — Iki Mesh/Warp PoC',
+    canvas:raw.canvas||{width:1254,height:1254},
+    parameters:raw.parameters||[],
+    textures:raw.textures,
+    parts:raw.parts.map(legacyPartToV1),
+    deformers:buildV1Deformers()
+  };
+}
+
 try{
  if(!('WebGL2RenderingContext' in window)) throw new Error('このブラウザでは WebGL2 が利用できません');
  status.textContent='モデルJSONを直接読み込み中…';
- let json;
+ let rawModel;
  try{
-   const r=await fetch('./model-direct.iki?v=20260917-7',{cache:'no-store'});
+   const r=await fetch('./model-direct.iki?v=20260917-8',{cache:'no-store'});
    if(!r.ok) throw new Error('model-direct.iki HTTP '+r.status);
-   json=await r.text();
-   if(!json.trim().startsWith('{')) throw new Error('model response is not JSON');
+   rawModel=JSON.parse(await r.text());
  }catch(e){fail('MODEL_FETCH',e);throw e;}
+ status.textContent='公式Iki v1スキーマへ変換中…';
+ let migrated;
+ try{migrated=migrateLegacyModel(rawModel);}catch(e){fail('MODEL_MIGRATE',e);throw e;}
  status.textContent='Iki Runtime を読み込み中…';
  let engine,format;
  try{
@@ -49,14 +149,14 @@ try{
    ]);
  }catch(e){fail('RUNTIME_IMPORT',e);throw e;}
  let model;
- try{model=format.loadIkiModel(json);}catch(e){fail('MODEL_PARSE',e);throw e;}
+ try{model=format.parseIkiModel(migrated);}catch(e){fail('MODEL_PARSE',e);throw e;}
  const canvas=document.getElementById('canvas');
  const player=new engine.IkiPlayer(canvas);
  let result;
  try{result=await player.load(model);}catch(e){fail('PLAYER_LOAD',e);throw e;}
  player.start();
- if(result?.failedTextures?.length) throw new Error('texture load failed: '+result.failedTextures.join(','));
- status.textContent='起動OK — Iki Runtime / mesh / warp2d を使用中';
+ if(result?.failedTextures?.length){fail('TEXTURE_LOAD',new Error('texture load failed: '+result.failedTextures.join(',')));throw new Error('texture load failed');}
+ status.textContent='起動OK — Iki Runtime / official v1 mesh / warp2d';
  const P={mouth:'ParamMouthOpenY',eyeL:'ParamEyeLOpen',eyeR:'ParamEyeROpen',gazeX:'ParamEyeBallX',gazeY:'ParamEyeBallY',x:'ParamAngleX',y:'ParamAngleY',z:'ParamAngleZ',breath:'ParamBreath',browL:'ParamBrowLY',browR:'ParamBrowRY'};
  const set=(id,v)=>player.setParameter(id,v);
  let idle=true,autoTurn=false,talk=false,blinkStart=0,blinkEnd=0;
