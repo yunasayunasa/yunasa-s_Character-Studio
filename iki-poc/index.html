@@ -1,1 +1,75 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Red Oni PoC</title><style>:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:#111;color:#eee}main{max-width:760px;margin:auto;padding:10px}.card{background:#1a1a1a;border:1px solid #333;border-radius:16px;padding:10px}.stage{aspect-ratio:1/1;display:grid;place-items:center;overflow:hidden;border-radius:12px;background:linear-gradient(45deg,#222 25%,transparent 25%),linear-gradient(-45deg,#222 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#222 75%),linear-gradient(-45deg,transparent 75%,#222 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0}#oni{width:88%;height:88%;object-fit:contain;transform-origin:50% 62%;will-change:transform;display:none}.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{border:1px solid #444;background:#262626;color:#fff;border-radius:12px;padding:11px 14px;font-size:15px;min-height:44px}.status{font-size:13px;color:#bbb;margin-top:10px}.note{font-size:12px;color:#888;line-height:1.5;margin-top:6px}</style></head><body><main><div class="card"><div class="stage"><img id="oni" alt="赤鬼キャラクター"></div><div class="row"><button id="idle">ゆらぎ ON</button><button id="check">確認アニメ</button><button id="reset">リセット</button></div><div id="status" class="status">赤鬼画像を読み込み中…</div><div class="note">表示確認版です。元の白背景は、外周につながった白だけを透過して表示しています。実Iki版では最初から透過レイヤー素材を使います。</div></div></main><script>(async()=>{const o=document.getElementById('oni'),s=document.getElementById('status');function cutOuterWhite(img){const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0);const im=x.getImageData(0,0,c.width,c.height),d=im.data,w=c.width,h=c.height,n=w*h,seen=new Uint8Array(n),q=new Int32Array(n);let head=0,tail=0;const bg=i=>{const p=i*4,r=d[p],g=d[p+1],b=d[p+2],a=d[p+3];return a>0&&r>220&&g>220&&b>220&&Math.max(r,g,b)-Math.min(r,g,b)<38};const add=i=>{if(i<0||i>=n||seen[i])return;seen[i]=1;if(bg(i))q[tail++]=i};for(let xx=0;xx<w;xx++){add(xx);add((h-1)*w+xx)}for(let yy=0;yy<h;yy++){add(yy*w);add(yy*w+w-1)}while(head<tail){const i=q[head++],p=i*4;d[p+3]=0;const xx=i%w;if(xx>0)add(i-1);if(xx<w-1)add(i+1);if(i>=w)add(i-w);if(i<n-w)add(i+w)}x.putImageData(im,0,0);return c.toDataURL('image/png')}try{const r=await fetch('./redoni.b64?v=3',{cache:'no-store'});if(!r.ok)throw new Error('image '+r.status);const b64=(await r.text()).trim(),tmp=new Image();tmp.onload=()=>{try{o.src=cutOuterWhite(tmp);o.style.display='block';s.textContent='表示OK。白背景を外周から透過処理しました。'}catch(e){o.src=tmp.src;o.style.display='block';s.textContent='表示OK（透過処理のみ失敗）';}};tmp.onerror=()=>{s.textContent='画像デコード失敗';};tmp.src='data:image/webp;base64,'+b64;}catch(e){s.textContent='読み込みエラー: '+(e&&e.message?e.message:String(e));return;}let on=true,t0=performance.now();function loop(t){if(on&&o.complete){const x=Math.sin((t-t0)/1100)*1.8,y=Math.sin((t-t0)/850)*1.2,r=Math.sin((t-t0)/1600)*.7;o.style.transform=`translate(${x}px,${y}px) rotate(${r}deg)`}requestAnimationFrame(loop)}requestAnimationFrame(loop);document.getElementById('idle').onclick=e=>{on=!on;e.target.textContent='ゆらぎ '+(on?'ON':'OFF');if(!on)o.style.transform='none'};document.getElementById('check').onclick=()=>{o.animate([{transform:'scale(1)'},{transform:'scale(.985,.96)'},{transform:'scale(1)'}],{duration:260});s.textContent='JavaScriptも動作しています。'};document.getElementById('reset').onclick=()=>{on=true;o.style.transform='none';s.textContent='表示OK。'};})();</script></body></html>
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Red Oni — Iki Mesh/Warp PoC</title>
+<style>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:#101010;color:#eee}main{max-width:820px;margin:auto;padding:10px}.card{background:#181818;border:1px solid #333;border-radius:16px;padding:10px}.stage{aspect-ratio:1/1;display:grid;place-items:center;overflow:hidden;border-radius:12px;background:linear-gradient(45deg,#222 25%,transparent 25%),linear-gradient(-45deg,#222 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#222 75%),linear-gradient(-45deg,transparent 75%,#222 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0}canvas{width:100%;height:100%;display:block}.badge{display:inline-block;margin-top:10px;padding:5px 9px;border:1px solid #555;border-radius:999px;font-size:12px;color:#ddd}.buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}button{border:1px solid #444;background:#262626;color:#fff;border-radius:12px;padding:10px 13px;min-height:44px;font-size:14px}button.active{background:#454545}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}.control{background:#202020;border:1px solid #333;border-radius:12px;padding:9px}.control label{display:flex;justify-content:space-between;font-size:12px;color:#ccc}.control input{width:100%;margin-top:8px}.status{font-size:13px;color:#bbb;margin-top:10px;white-space:pre-wrap}.note{font-size:12px;color:#888;line-height:1.45;margin-top:6px}@media(max-width:560px){.controls{grid-template-columns:1fr 1fr}main{padding:7px}}
+</style>
+</head>
+<body><main><div class="card">
+<div class="stage"><canvas id="canvas" width="720" height="720"></canvas></div>
+<div class="badge">Iki Runtime / actual mesh + warp2d</div>
+<div class="buttons">
+<button id="idle" class="active">自動まばたき・呼吸 ON</button>
+<button id="turn">自動左右</button><button id="talk">口パク</button><button id="blink">まばたき</button><button id="reset">リセット</button>
+</div>
+<div class="controls">
+<div class="control"><label>Angle X <span id="vAngleX">0</span></label><input id="angleX" type="range" min="-30" max="30" step="1" value="0"></div>
+<div class="control"><label>Angle Y <span id="vAngleY">0</span></label><input id="angleY" type="range" min="-30" max="30" step="1" value="0"></div>
+<div class="control"><label>Angle Z <span id="vAngleZ">0</span></label><input id="angleZ" type="range" min="-30" max="30" step="1" value="0"></div>
+<div class="control"><label>視線 X <span id="vGazeX">0</span></label><input id="gazeX" type="range" min="-1" max="1" step="0.05" value="0"></div>
+<div class="control"><label>視線 Y <span id="vGazeY">0</span></label><input id="gazeY" type="range" min="-1" max="1" step="0.05" value="0"></div>
+<div class="control"><label>口 <span id="vMouth">0</span></label><input id="mouth" type="range" min="0" max="1" step="0.02" value="0"></div>
+<div class="control"><label>眉 <span id="vBrow">0</span></label><input id="brow" type="range" min="-1" max="1" step="0.05" value="0"></div>
+</div>
+<div id="status" class="status">Iki Runtime を準備中…</div>
+<div class="note">これは前の「ポヨンポヨン」表示確認版ではありません。Angle X / Y は .iki の 5×5 mesh grid と 3×3 warp2d keyform を動かします。画質はiPhone実機検証を優先した軽量テクスチャです。</div>
+</div></main>
+<script type="module">
+const status=document.getElementById('status');
+const fail=e=>{console.error(e);status.textContent='起動エラー: '+(e?.message||String(e));};
+try{
+ if(!('WebGL2RenderingContext' in window)) throw new Error('このブラウザでは WebGL2 が利用できません');
+ if(!('DecompressionStream' in window)) throw new Error('このSafariでは gzip 展開APIが利用できません');
+ status.textContent='モデルデータを読み込み中…';
+ const files=['payload-0.txt','payload-1.txt','payload-2.txt','payload-3.txt'];
+ const parts=await Promise.all(files.map(async f=>{const r=await fetch(f+'?v=20260917-2',{cache:'no-store'});if(!r.ok)throw new Error(f+' HTTP '+r.status);return (await r.text()).trim()}));
+ const raw=atob(parts.join('')); const bytes=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+ const json=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+ status.textContent='Iki Runtime を読み込み中…';
+ const [engine,format]=await Promise.all([
+   import('https://cdn.jsdelivr.net/npm/@ikijs/engine@0.3.2/+esm'),
+   import('https://cdn.jsdelivr.net/npm/@ikijs/format@0.2.0/+esm')
+ ]);
+ const model=format.loadIkiModel(json);
+ const canvas=document.getElementById('canvas');
+ const player=new engine.IkiPlayer(canvas);
+ const result=await player.load(model);
+ player.start();
+ if(result?.failedTextures?.length) throw new Error('texture load failed: '+result.failedTextures.join(','));
+ status.textContent='起動OK — Iki Runtime / mesh / warp2d を使用中';
+ const P={mouth:'ParamMouthOpenY',eyeL:'ParamEyeLOpen',eyeR:'ParamEyeROpen',gazeX:'ParamEyeBallX',gazeY:'ParamEyeBallY',x:'ParamAngleX',y:'ParamAngleY',z:'ParamAngleZ',breath:'ParamBreath',browL:'ParamBrowLY',browR:'ParamBrowRY'};
+ const set=(id,v)=>player.setParameter(id,v);
+ let idle=true,autoTurn=false,talk=false,blinkStart=0,blinkEnd=0;
+ const bind=(el,p,out)=>{const e=document.getElementById(el),o=document.getElementById(out);const f=()=>{const v=+e.value;set(p,v);o.textContent=String(v)};e.addEventListener('input',f);f()};
+ bind('angleX',P.x,'vAngleX');bind('angleY',P.y,'vAngleY');bind('angleZ',P.z,'vAngleZ');bind('gazeX',P.gazeX,'vGazeX');bind('gazeY',P.gazeY,'vGazeY');bind('mouth',P.mouth,'vMouth');
+ document.getElementById('brow').addEventListener('input',e=>{const v=+e.target.value;set(P.browL,v);set(P.browR,v);document.getElementById('vBrow').textContent=String(v)});
+ const manualBlink=()=>{blinkStart=performance.now();blinkEnd=blinkStart+240};
+ document.getElementById('blink').onclick=manualBlink;
+ document.getElementById('idle').onclick=e=>{idle=!idle;e.currentTarget.classList.toggle('active',idle);e.currentTarget.textContent='自動まばたき・呼吸 '+(idle?'ON':'OFF')};
+ document.getElementById('turn').onclick=e=>{autoTurn=!autoTurn;e.currentTarget.classList.toggle('active',autoTurn)};
+ document.getElementById('talk').onclick=e=>{talk=!talk;e.currentTarget.classList.toggle('active',talk);if(!talk)set(P.mouth,+document.getElementById('mouth').value)};
+ document.getElementById('reset').onclick=()=>{autoTurn=false;talk=false;document.getElementById('turn').classList.remove('active');document.getElementById('talk').classList.remove('active');[['angleX',0],['angleY',0],['angleZ',0],['gazeX',0],['gazeY',0],['mouth',0],['brow',0]].forEach(([id,v])=>{const e=document.getElementById(id);e.value=v;e.dispatchEvent(new Event('input'))});set(P.eyeL,1);set(P.eyeR,1)};
+ let nextAutoBlink=performance.now()+1800;
+ function frame(now){
+   if(idle){set(P.breath,0.5+0.5*Math.sin(now*0.0017));if(now>=nextAutoBlink&&now>blinkEnd){manualBlink();nextAutoBlink=now+2400+Math.random()*2600;}}
+   if(blinkEnd>now){const t=(now-blinkStart)/(blinkEnd-blinkStart);const open=Math.max(0,Math.min(1,Math.abs(t*2-1)));set(P.eyeL,open);set(P.eyeR,open)}else{set(P.eyeL,1);set(P.eyeR,1)}
+   if(autoTurn){const v=Math.sin(now*0.00075)*26;set(P.x,v);document.getElementById('angleX').value=v;document.getElementById('vAngleX').textContent=v.toFixed(1)}
+   if(talk)set(P.mouth,0.12+0.88*Math.abs(Math.sin(now*0.009)));
+   requestAnimationFrame(frame);
+ }
+ requestAnimationFrame(frame);
+}catch(e){fail(e)}
+</script></body></html>
