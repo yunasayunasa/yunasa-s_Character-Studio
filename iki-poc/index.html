@@ -25,29 +25,21 @@
 <div class="control"><label>眉 <span id="vBrow">0</span></label><input id="brow" type="range" min="-1" max="1" step="0.05" value="0"></div>
 </div>
 <div id="status" class="status">Iki Runtime を準備中…</div>
-<div class="note">これは前の「ポヨンポヨン」表示確認版ではありません。Angle X / Y は .iki の 5×5 mesh grid と 3×3 warp2d keyform を動かします。</div>
+<div class="note">gzip経路を完全に廃止し、.iki JSONを直接読み込みます。Angle X / Y はメッシュ＋warp2dを動かします。</div>
 </div></main>
 <script type="module">
 const status=document.getElementById('status');
 const fail=(stage,e,extra='')=>{console.error(stage,e);status.textContent='起動エラー ['+stage+']: '+(e?.message||String(e))+(extra?'\n'+extra:'');};
 try{
  if(!('WebGL2RenderingContext' in window)) throw new Error('このブラウザでは WebGL2 が利用できません');
- status.textContent='モデルデータを読み込み中…';
- const files=['payload-0.txt','payload-1.txt','payload-2.txt','payload-3.txt'];
- const parts=await Promise.all(files.map(async f=>{const r=await fetch(f+'?v=20260917-5',{cache:'reload'});if(!r.ok)throw new Error(f+' HTTP '+r.status);return (await r.text()).trim()}));
- let bytes;
- try{
-   const joined=parts.join('');
-   const raw=atob(joined);
-   bytes=new Uint8Array(raw.length);
-   for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
- }catch(e){fail('BASE64',e);throw e;}
- status.textContent='モデルデータを展開中…';
+ status.textContent='モデルJSONを直接読み込み中…';
  let json;
  try{
-   const pako=await import('https://cdn.jsdelivr.net/npm/pako@2.1.0/+esm');
-   json=pako.ungzip(bytes,{to:'string'});
- }catch(e){fail('GZIP',e,'bytes='+bytes.length+' header='+Array.from(bytes.slice(0,4)).map(v=>v.toString(16).padStart(2,'0')).join(' '));throw e;}
+   const r=await fetch('./model-direct.iki?v=20260917-7',{cache:'no-store'});
+   if(!r.ok) throw new Error('model-direct.iki HTTP '+r.status);
+   json=await r.text();
+   if(!json.trim().startsWith('{')) throw new Error('model response is not JSON');
+ }catch(e){fail('MODEL_FETCH',e);throw e;}
  status.textContent='Iki Runtime を読み込み中…';
  let engine,format;
  try{
