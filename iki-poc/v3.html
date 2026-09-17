@@ -31,7 +31,7 @@ function triMesh(a,b,c){
   return {vertices:[...a,...b,...c],uvs:[0,0,1,0,.5,1],indices:[0,1,2]};
 }
 function ellipseMesh(cx,cy,rx,ry,segments=28){
-  const vertices=[cx,cy],uvs:[number,number]|number[]=[];
+  const vertices=[cx,cy],uvs=[];
   uvs.push(.5,.5);
   for(let i=0;i<=segments;i++){
     const a=i/segments*Math.PI*2;
