@@ -25,28 +25,42 @@
 <div class="control"><label>眉 <span id="vBrow">0</span></label><input id="brow" type="range" min="-1" max="1" step="0.05" value="0"></div>
 </div>
 <div id="status" class="status">Iki Runtime を準備中…</div>
-<div class="note">これは前の「ポヨンポヨン」表示確認版ではありません。Angle X / Y は .iki の 5×5 mesh grid と 3×3 warp2d keyform を動かします。画質はiPhone実機検証を優先した軽量テクスチャです。</div>
+<div class="note">これは前の「ポヨンポヨン」表示確認版ではありません。Angle X / Y は .iki の 5×5 mesh grid と 3×3 warp2d keyform を動かします。iPhone Safariではブラウザ標準gzip展開を使わず、pakoで展開します。</div>
 </div></main>
 <script type="module">
 const status=document.getElementById('status');
-const fail=e=>{console.error(e);status.textContent='起動エラー: '+(e?.message||String(e));};
+const fail=(stage,e)=>{console.error(stage,e);status.textContent='起動エラー ['+stage+']: '+(e?.message||String(e));};
 try{
  if(!('WebGL2RenderingContext' in window)) throw new Error('このブラウザでは WebGL2 が利用できません');
- if(!('DecompressionStream' in window)) throw new Error('このSafariでは gzip 展開APIが利用できません');
  status.textContent='モデルデータを読み込み中…';
  const files=['payload-0.txt','payload-1.txt','payload-2.txt','payload-3.txt'];
- const parts=await Promise.all(files.map(async f=>{const r=await fetch(f+'?v=20260917-2',{cache:'no-store'});if(!r.ok)throw new Error(f+' HTTP '+r.status);return (await r.text()).trim()}));
- const raw=atob(parts.join('')); const bytes=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
- const json=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+ const parts=await Promise.all(files.map(async f=>{const r=await fetch(f+'?v=20260917-4',{cache:'no-store'});if(!r.ok)throw new Error(f+' HTTP '+r.status);return (await r.text()).trim()}));
+ let bytes;
+ try{
+   const raw=atob(parts.join(''));
+   bytes=new Uint8Array(raw.length);
+   for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+ }catch(e){fail('BASE64',e);throw e;}
+ status.textContent='モデルデータを展開中…';
+ let json;
+ try{
+   const pako=await import('https://cdn.jsdelivr.net/npm/pako@2.1.0/+esm');
+   json=pako.ungzip(bytes,{to:'string'});
+ }catch(e){fail('GZIP',e);throw e;}
  status.textContent='Iki Runtime を読み込み中…';
- const [engine,format]=await Promise.all([
-   import('https://cdn.jsdelivr.net/npm/@ikijs/engine@0.3.2/+esm'),
-   import('https://cdn.jsdelivr.net/npm/@ikijs/format@0.2.0/+esm')
- ]);
- const model=format.loadIkiModel(json);
+ let engine,format;
+ try{
+   [engine,format]=await Promise.all([
+     import('https://cdn.jsdelivr.net/npm/@ikijs/engine@0.3.2/+esm'),
+     import('https://cdn.jsdelivr.net/npm/@ikijs/format@0.2.0/+esm')
+   ]);
+ }catch(e){fail('RUNTIME_IMPORT',e);throw e;}
+ let model;
+ try{model=format.loadIkiModel(json);}catch(e){fail('MODEL_PARSE',e);throw e;}
  const canvas=document.getElementById('canvas');
  const player=new engine.IkiPlayer(canvas);
- const result=await player.load(model);
+ let result;
+ try{result=await player.load(model);}catch(e){fail('PLAYER_LOAD',e);throw e;}
  player.start();
  if(result?.failedTextures?.length) throw new Error('texture load failed: '+result.failedTextures.join(','));
  status.textContent='起動OK — Iki Runtime / mesh / warp2d を使用中';
@@ -71,5 +85,5 @@ try{
    requestAnimationFrame(frame);
  }
  requestAnimationFrame(frame);
-}catch(e){fail(e)}
+}catch(e){if(!status.textContent.startsWith('起動エラー'))fail('UNKNOWN',e)}
 </script></body></html>
