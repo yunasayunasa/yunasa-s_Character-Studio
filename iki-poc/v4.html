@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Red Oni — Iki minimal textured mesh</title>
+<style>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:#101010;color:#eee}main{max-width:760px;margin:auto;padding:8px}.card{background:#181818;border:1px solid #333;border-radius:16px;padding:10px}.stage{aspect-ratio:1/1;display:grid;place-items:center;overflow:hidden;border-radius:12px;background:linear-gradient(45deg,#242424 25%,transparent 25%),linear-gradient(-45deg,#242424 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#242424 75%),linear-gradient(-45deg,transparent 75%,#242424 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0}canvas{width:100%;height:100%;display:block}.badge{display:inline-block;margin-top:10px;padding:5px 9px;border:1px solid #555;border-radius:999px;font-size:12px}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}.control{background:#202020;border:1px solid #333;border-radius:12px;padding:9px}.control label{display:flex;justify-content:space-between;font-size:12px}.control input{width:100%;margin-top:8px}.status{font-size:13px;color:#bbb;margin-top:10px;white-space:pre-wrap}.note{font-size:12px;color:#888;line-height:1.45;margin-top:6px}
+</style>
+</head>
+<body><main><div class="card">
+<div class="stage"><canvas id="canvas" width="720" height="720"></canvas></div>
+<div class="badge">Iki Runtime / PNG 1枚 / mesh + warp2d</div>
+<div class="controls">
+<div class="control"><label>Angle X <span id="vx">0</span></label><input id="x" type="range" min="-30" max="30" step="1" value="0"></div>
+<div class="control"><label>Angle Y <span id="vy">0</span></label><input id="y" type="range" min="-30" max="30" step="1" value="0"></div>
+</div>
+<div id="status" class="status">準備中…</div>
+<div class="note">v3で動作確認できたIki構成に、64×64透過PNGを1枚だけ直接埋め込んだ最小テストです。外部画像読込・Canvas変換・事前デコードはありません。</div>
+</div></main>
+<script type="module">
+const status=document.getElementById('status');
+const fail=(stage,e)=>{console.error(stage,e);status.textContent='起動エラー ['+stage+']: '+(e?.message||String(e));};
+
+function makeMesh(n=8,size=512){
+  const v=[],uv=[],idx=[],half=size/2;
+  for(let r=0;r<=n;r++){
+    const t=r/n,y=half-t*size;
+    for(let c=0;c<=n;c++){
+      const s=c/n,x=-half+s*size;
+      v.push(x,y);uv.push(s,t);
+    }
+  }
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++){
+    const a=r*(n+1)+c,b=a+1,d=(r+1)*(n+1)+c,e=d+1;
+    idx.push(a,d,b,b,d,e);
+  }
+  return {vertices:v,uvs:uv,indices:idx};
+}
+function makeWarp(size=512){
+  const cols=4,rows=4,half=size/2,points=[];
+  for(let r=0;r<=rows;r++){
+    const t=r/rows,y=half-t*size;
+    for(let c=0;c<=cols;c++){
+      const s=c/cols,x=-half+s*size;points.push(x,y);
+    }
+  }
+  const values=[-30,0,30],keyforms2d=[];
+  for(const ay of values)for(const ax of values){
+    const nx=ax/30,ny=ay/30,off=[];
+    for(let r=0;r<=rows;r++){
+      const t=r/rows,headWeight=Math.max(0,1-t*1.05);
+      for(let c=0;c<=cols;c++){
+        const s=c/cols,xn=s*2-1;
+        off.push(
+          headWeight*(nx*(18-10*xn)+ny*4*xn),
+          headWeight*(ny*(15-4*Math.abs(xn))+nx*4*xn)
+        );
+      }
+    }
+    keyforms2d.push({offsets:off});
+  }
+  return {kind:'warp',id:'faceWarp',grid:{cols,rows,points},warp2d:{parameter:'ParamAngleX',parameterY:'ParamAngleY',valuesX:values,valuesY:values,keyforms2d}};
+}
+
+try{
+  if(!('WebGL2RenderingContext' in window)) throw new Error('WebGL2 unavailable');
+
+  const tex='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAAwFBMVEUAAABaKyIuIh6iLCLisJCealP20K7QNCj19PNnRTSaTzbSkWvm3dTiSTfbZExtV1D8BASysbDya2Xg3t9tZ2aoYFmkXlPaX1N2ExOthWrq4dozLCuuoZ0yKylPLSmcalDsXU7gkHZuZyHdm3PmppZpUlWiSTplRThbTUn//wBYLSe3DxjOQzfPnG3YppaxYxW3mWqlkpyq5f//AP/dp4X//3/54LUSHGpwSTh4rq6kMSynLSWviHahmprROzLSRjozrfgBAAAAQHRSTlMA/Pv6+vr5/Qv3+vny+fr6AQYOYRARW2IC/aJg/phjo6EaCacZnKKvXwGVBKRVVwMOVggBrwIjDmccYJuonIxiw31UVAAABEFJREFUeNqlV4du4zgQHZIizaJiKZLcW1xSNsmmbW///1f7RsrhFjjchcrRsCDZmMcpb95QRP+2GqLdOb19janabqn6H/aTLJsQXVXv3mRvx2cMUPVYb7AnO6dt1tCuqibVeHgg1n5MafuT7vJsdMM/VOOBDsxTM08soshG2XYyGerAgSg1aWpGGTwYAWU7sdWwEhxMkgffA/RrMh4QxQe6S5dKYfM87y4I5HFINVAE42HPELh0CL+qJh6gKWmes98M8pcjp8chWbgz6Z4hFOxVl8f8S3wMtm2/Cm3SJFeMIAQ7k22jST2lVsNO6QQrBOU5CvhxY2M9qKhVQvksN4lJjUlCl9C2iQZ4anabRHufmDxLjDFwYpS1dlBXTUISVNCFEHBDiJD/pPi2Hl9NbpRC8HnyoEQCABW2v5pmiJZwDnOlYMwhJFpN7HRYO7Wonhp11vjkqi0H9dK4+tZVX8Na61miFBd3SDM2Jy/ggfABVNBCneJL+LK+aCelEM57LaSe3O5ub+k+3nx3LaSQUmuvAyM5vQ97eh/N5LVg+qL6YebBZ+9mPszo4zSeSFJ4z80QdAgaC5cQDrFMrOkeGUQEQjmdpElIg/c+P0WH0HQ8ElqLjseggsGtUlVkJcdUd/snQUgQum+mDP3YRg7KMZ0vNgHF1xI91DmQKF1IV8bTaMFmenXZKQoDCFkkKG5sDm9dARHZ0xGpB5dnSeIgDeYYrYjO6Zl5JipARSiCEvgBsRQtxXV0DYe13ttjUQgIimBKaeiLdufTqAhq7Ojk4qEoZvgIrqfDV3qH/6IkGVtKyRE4eFKgoYBRSBDLV/QUAXCC24JowVxEPzrvcNUXeFARWaipUkrq7+++gUxOw5ZRcL28RkJu7Ph1Hn9FyGnqRe8APCg6ELkxqVNRDbWSKPrzCvYFyOhRU83qcDRmuahez+I5tQFaPIcmSN7cq6LwHp15SIK5ozJirH2EDgbMAiV5oSSOmYA5EczhKkIar2i335PGNBQMIHhEgI0qD8+HGB7w8YRorXyes3WnK/AD0tD2f8UoStVgVw48670AgJdeRR+c39PGqyxD6v1IdTzAMUn6rI0/ejcbH7Ts3O9SyZG4vIlLQbc+oXWkk38sIdoBc6m+ZhPnsPFiJft7ufowAOESBo5n0gsA0iEuBgCcAwGzgPuhXq+6pvSb3YABXdOah5Nzn5E2yxH406DZ/IlqGMH/7mnBIXymYS9gDWvAyk47KwaIluSyLG15b1sBLSmtxUNpWRc2NB10xrgAgPt7WDsh+jcha197VzrrF5eu6G+tZUUtvpePr7pQ0lnaL8JUK5YvD2mQcpbyO9B8fmb/uyXZgzlMeKSa2RIrTdIl6tGJTAp7G9HT1qYzCOFsSdgTMcx//NgcLy6ujzayCrheLtbr9cM/Ulba+immBH8oZw3Asu4O0NNpfDf3B+Py1aLx+g0CGkKDpDIzbAAAAABJRU5ErkJggg==';
+  status.textContent='Iki Runtimeを読み込み中…';
+  let engine,format;
+  try{
+    [engine,format]=await Promise.all([
+      import('https://cdn.jsdelivr.net/npm/@ikijs/engine@0.3.2/+esm'),
+      import('https://cdn.jsdelivr.net/npm/@ikijs/format@0.2.0/+esm')
+    ]);
+  }catch(e){fail('RUNTIME_IMPORT',e);throw e}
+
+  const raw={
+    version:1,
+    name:'Red Oni minimal single-texture test',
+    canvas:{width:512,height:512},
+    parameters:[
+      {id:'ParamAngleX',name:'Angle X',min:-30,max:30,default:0},
+      {id:'ParamAngleY',name:'Angle Y',min:-30,max:30,default:0}
+    ],
+    textures:[{source:tex}],
+    parts:[{
+      id:'redoni',color:[1,1,1,1],width:1,height:1,
+      transform:{x:0,y:0,rotation:0,scaleX:1,scaleY:1,opacity:1},order:0,
+      texture:{index:0,uv:{x:0,y:0,width:1,height:1}},
+      deformer:'faceWarp',mesh:makeMesh()
+    }],
+    deformers:[makeWarp()]
+  };
+
+  let model;
+  try{model=format.parseIkiModel(raw)}catch(e){fail('MODEL_PARSE',e);throw e}
+  const player=new engine.IkiPlayer(document.getElementById('canvas'));
+  let result;
+  try{result=await player.load(model)}catch(e){fail('PLAYER_LOAD',e);throw e}
+  if(result?.superseded) throw new Error('load superseded');
+  if(result?.failedTextures?.length){fail('TEXTURE_LOAD',new Error(result.failedTextures.join(',')));throw new Error('texture load failed')}
+
+  player.start();
+  status.textContent='起動OK — Red Oni PNG 1枚 / real mesh + warp2d';
+  const set=(id,v)=>player.setParameter(id,v);
+  const bind=(id,p,out)=>{const el=document.getElementById(id),o=document.getElementById(out);const f=()=>{const v=+el.value;set(p,v);o.textContent=v.toFixed(0)};el.addEventListener('input',f);f()};
+  bind('x','ParamAngleX','vx');bind('y','ParamAngleY','vy');
+}catch(e){if(!status.textContent.startsWith('起動エラー'))fail('UNKNOWN',e)}
+</script>
+</body></html>
