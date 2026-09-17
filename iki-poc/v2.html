@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Red Oni — clean Iki mesh PoC</title>
+<title>Red Oni — Iki mesh PoC</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:#101010;color:#eee}main{max-width:820px;margin:auto;padding:8px}.card{background:#181818;border:1px solid #333;border-radius:16px;padding:10px}.stage{aspect-ratio:1/1;display:grid;place-items:center;overflow:hidden;border-radius:12px;background:linear-gradient(45deg,#242424 25%,transparent 25%),linear-gradient(-45deg,#242424 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#242424 75%),linear-gradient(-45deg,transparent 75%,#242424 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0}canvas{width:100%;height:100%;display:block}.badge{display:inline-block;margin-top:10px;padding:5px 9px;border:1px solid #555;border-radius:999px;font-size:12px}.buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{border:1px solid #444;background:#262626;color:#fff;border-radius:12px;padding:10px 13px;min-height:44px}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}.control{background:#202020;border:1px solid #333;border-radius:12px;padding:9px}.control label{display:flex;justify-content:space-between;font-size:12px}.control input{width:100%;margin-top:8px}.status{font-size:13px;color:#bbb;margin-top:10px;white-space:pre-wrap}.note{font-size:12px;color:#888;line-height:1.45;margin-top:6px}
 </style>
 </head>
 <body><main><div class="card">
 <div class="stage"><canvas id="canvas" width="720" height="720"></canvas></div>
-<div class="badge">Iki Runtime / verified texture / real warp2d</div>
+<div class="badge">Iki Runtime / Safari-safe texture / real warp2d</div>
 <div class="buttons"><button id="turn">自動左右</button><button id="reset">リセット</button></div>
 <div class="controls">
 <div class="control"><label>Angle X <span id="vx">0</span></label><input id="x" type="range" min="-30" max="30" step="1" value="0"></div>
@@ -18,23 +18,68 @@
 <div class="control"><label>Angle Z <span id="vz">0</span></label><input id="z" type="range" min="-30" max="30" step="1" value="0"></div>
 </div>
 <div id="status" class="status">準備中…</div>
-<div class="note">旧モデルを使わず、実際の透過Red Oni画像1枚から公式Iki v1モデルを組み立てています。Angle X/Yはwarp2d、Angle Zはmatrix deformerです。</div>
+<div class="note">WebPをSafari自身で一度デコードしてPNGへ変換し、Ikiへ渡します。createImageBitmapのオプション付きデコードが失敗する場合も自動フォールバックします。</div>
 </div></main>
 <script type="module">
 const status=document.getElementById('status');
 const fail=(s,e)=>{console.error(s,e);status.textContent='起動エラー ['+s+']: '+(e?.message||String(e));};
-const blobToDataURL=blob=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)});
-
+const nativeCIB=globalThis.createImageBitmap?.bind(globalThis);
+if(!nativeCIB) throw new Error('createImageBitmap unavailable');
+globalThis.createImageBitmap=async function(source,...args){
+  try{return await nativeCIB(source,...args)}catch(first){
+    try{return await nativeCIB(source)}catch(second){
+      if(source instanceof Blob){
+        const url=URL.createObjectURL(source);
+        try{
+          const img=new Image();
+          img.decoding='async';
+          img.src=url;
+          await img.decode();
+          const c=document.createElement('canvas');
+          c.width=img.naturalWidth;c.height=img.naturalHeight;
+          const ctx=c.getContext('2d',{alpha:true});
+          if(!ctx) throw new Error('2D canvas unavailable');
+          ctx.drawImage(img,0,0);
+          return await nativeCIB(c);
+        }finally{URL.revokeObjectURL(url)}
+      }
+      throw second;
+    }
+  }
+};
+const blobToDataURL=blob=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error('FileReader failed'));r.readAsDataURL(blob)});
+const canvasToBlob=(c,type)=>new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error('canvas.toBlob failed')),type));
+async function webpToPngDataURL(url){
+  const r=await fetch(url,{cache:'no-store'});
+  if(!r.ok) throw new Error('texture HTTP '+r.status);
+  const webp=new Blob([await r.arrayBuffer()],{type:'image/webp'});
+  const objectUrl=URL.createObjectURL(webp);
+  try{
+    const img=new Image();
+    img.decoding='async';
+    img.src=objectUrl;
+    await img.decode();
+    if(!img.naturalWidth||!img.naturalHeight) throw new Error('decoded image has zero size');
+    status.textContent=`元画像デコードOK — ${img.naturalWidth}×${img.naturalHeight}\nPNGへ変換中…`;
+    const c=document.createElement('canvas');
+    c.width=img.naturalWidth;c.height=img.naturalHeight;
+    const ctx=c.getContext('2d',{alpha:true});
+    if(!ctx) throw new Error('2D canvas unavailable');
+    ctx.clearRect(0,0,c.width,c.height);
+    ctx.drawImage(img,0,0);
+    const png=await canvasToBlob(c,'image/png');
+    const data=await blobToDataURL(png);
+    if(typeof data!=='string'||!data.startsWith('data:image/png;base64,')) throw new Error('PNG data URI creation failed');
+    return data;
+  }finally{URL.revokeObjectURL(objectUrl)}
+}
 function makeMesh(n=8,size=1254){
   const v=[],uv=[],idx=[],half=size/2;
   for(let r=0;r<=n;r++){
-    const t=r/n, y=half-t*size;
-    for(let c=0;c<=n;c++){
-      const s=c/n, x=-half+s*size;
-      v.push(x,y); uv.push(s,t);
-    }
+    const t=r/n,y=half-t*size;
+    for(let c=0;c<=n;c++){const s=c/n,x=-half+s*size;v.push(x,y);uv.push(s,t)}
   }
-  for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++){
     const a=r*(n+1)+c,b=a+1,d=(r+1)*(n+1)+c,e=d+1;
     idx.push(a,d,b,b,d,e);
   }
@@ -42,76 +87,53 @@ function makeMesh(n=8,size=1254){
 }
 function makeWarp(size=1254){
   const cols=4,rows=4,half=size/2,points=[];
-  for(let r=0;r<=rows;r++){
-    const t=r/rows,y=half-t*size;
-    for(let c=0;c<=cols;c++){
-      const s=c/cols,x=-half+s*size; points.push(x,y);
-    }
-  }
+  for(let r=0;r<=rows;r++){const t=r/rows,y=half-t*size;for(let c=0;c<=cols;c++){const s=c/cols,x=-half+s*size;points.push(x,y)}}
   const values=[-30,0,30],keyforms2d=[];
-  for(const ay of values) for(const ax of values){
+  for(const ay of values)for(const ax of values){
     const nx=ax/30,ny=ay/30,off=[];
     for(let r=0;r<=rows;r++){
-      const t=r/rows;
-      const headWeight=Math.max(0,1-t*1.15);
+      const t=r/rows,headWeight=Math.max(0,1-t*1.15);
       for(let c=0;c<=cols;c++){
         const s=c/cols,xn=s*2-1;
-        const dx=headWeight*(nx*(34-20*xn)+ny*8*xn);
-        const dy=headWeight*(ny*(28-7*Math.abs(xn))+nx*7*xn);
-        off.push(dx,dy);
+        off.push(headWeight*(nx*(34-20*xn)+ny*8*xn),headWeight*(ny*(28-7*Math.abs(xn))+nx*7*xn));
       }
     }
     keyforms2d.push({offsets:off});
   }
   return {kind:'warp',id:'faceWarp',parent:'headDeformer',grid:{cols,rows,points},warp2d:{parameter:'ParamAngleX',parameterY:'ParamAngleY',valuesX:values,valuesY:values,keyforms2d}};
 }
-
 try{
  if(!('WebGL2RenderingContext' in window)) throw new Error('WebGL2 unavailable');
- status.textContent='Red Oni透過画像を読み込み中…';
+ status.textContent='Red Oni透過画像をSafari互換経路で読み込み中…';
  let tex;
- try{
-   const r=await fetch('./redoni-cutout.webp?v=20260917-9',{cache:'no-store'});
-   if(!r.ok) throw new Error('texture HTTP '+r.status);
-   tex=await blobToDataURL(await r.blob());
- }catch(e){fail('TEXTURE_FETCH',e);throw e;}
- status.textContent='Iki Runtimeを読み込み中…';
+ try{tex=await webpToPngDataURL('./redoni-cutout.webp?v=20260917-10')}catch(e){fail('TEXTURE_PREP',e);throw e}
+ status.textContent='PNG変換OK — Iki Runtimeを読み込み中…';
  let engine,format;
- try{
-   [engine,format]=await Promise.all([
-     import('https://cdn.jsdelivr.net/npm/@ikijs/engine@0.3.2/+esm'),
-     import('https://cdn.jsdelivr.net/npm/@ikijs/format@0.2.0/+esm')
-   ]);
- }catch(e){fail('RUNTIME_IMPORT',e);throw e;}
+ try{[engine,format]=await Promise.all([
+   import('https://cdn.jsdelivr.net/npm/@ikijs/engine@0.3.2/+esm'),
+   import('https://cdn.jsdelivr.net/npm/@ikijs/format@0.2.0/+esm')
+ ])}catch(e){fail('RUNTIME_IMPORT',e);throw e}
  const mesh=makeMesh();
- const raw={
-   version:1,
-   name:'Red Oni clean mesh PoC',
-   canvas:{width:1254,height:1254},
-   parameters:[
-     {id:'ParamAngleX',name:'Angle X',min:-30,max:30,default:0},
-     {id:'ParamAngleY',name:'Angle Y',min:-30,max:30,default:0},
-     {id:'ParamAngleZ',name:'Angle Z',min:-30,max:30,default:0}
-   ],
-   textures:[{source:tex}],
-   parts:[{
-     id:'redoni',color:[1,1,1,1],width:1,height:1,
-     transform:{x:0,y:0,rotation:0,scaleX:1,scaleY:1,opacity:1},order:0,
-     texture:{index:0,uv:{x:0,y:0,width:1,height:1}},deformer:'faceWarp',mesh
-   }],
-   deformers:[
-     {id:'headDeformer',pivot:{x:0,y:0},transform:{x:0,y:0,rotation:0,scaleX:1,scaleY:1},bindings:[{parameter:'ParamAngleZ',channel:'rotate',from:-8,to:8}]},
-     makeWarp()
-   ]
- };
+ const raw={version:1,name:'Red Oni Safari-safe mesh PoC',canvas:{width:1254,height:1254},parameters:[
+   {id:'ParamAngleX',name:'Angle X',min:-30,max:30,default:0},
+   {id:'ParamAngleY',name:'Angle Y',min:-30,max:30,default:0},
+   {id:'ParamAngleZ',name:'Angle Z',min:-30,max:30,default:0}
+ ],textures:[{source:tex}],parts:[{
+   id:'redoni',color:[1,1,1,1],width:1,height:1,
+   transform:{x:0,y:0,rotation:0,scaleX:1,scaleY:1,opacity:1},order:0,
+   texture:{index:0,uv:{x:0,y:0,width:1,height:1}},deformer:'faceWarp',mesh
+ }],deformers:[
+   {id:'headDeformer',pivot:{x:0,y:0},transform:{x:0,y:0,rotation:0,scaleX:1,scaleY:1},bindings:[{parameter:'ParamAngleZ',channel:'rotate',from:-8,to:8}]},
+   makeWarp()
+ ]};
  let model;
- try{model=format.parseIkiModel(raw);}catch(e){fail('MODEL_PARSE',e);throw e;}
+ try{model=format.parseIkiModel(raw)}catch(e){fail('MODEL_PARSE',e);throw e}
  const player=new engine.IkiPlayer(document.getElementById('canvas'));
  let result;
- try{result=await player.load(model);}catch(e){fail('PLAYER_LOAD',e);throw e;}
- if(result?.failedTextures?.length){fail('TEXTURE_LOAD',new Error(result.failedTextures.join(',')));throw new Error('texture load failed');}
+ try{result=await player.load(model)}catch(e){fail('PLAYER_LOAD',e);throw e}
+ if(result?.failedTextures?.length){fail('TEXTURE_LOAD',new Error(result.failedTextures.join(',')));throw new Error('texture load failed')}
  player.start();
- status.textContent='起動OK — verified Red Oni texture / real mesh + warp2d';
+ status.textContent='起動OK — Safari-safe texture / real mesh + warp2d';
  const set=(id,v)=>player.setParameter(id,v);
  const bind=(id,p,out)=>{const el=document.getElementById(id),o=document.getElementById(out);const f=()=>{const v=+el.value;set(p,v);o.textContent=v.toFixed(0)};el.addEventListener('input',f);f()};
  bind('x','ParamAngleX','vx');bind('y','ParamAngleY','vy');bind('z','ParamAngleZ','vz');
