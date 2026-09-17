@@ -126,7 +126,8 @@ function lzw(indexes) {
     writeCode(prefix);
     if (nextCode < 4096) {
       dictionary.set(key, nextCode++);
-      if (nextCode === (1 << codeSize) && codeSize < 12) codeSize += 1;
+      // Encoder dictionary is one entry ahead of the decoder until next output.
+      if (nextCode > (1 << codeSize) && codeSize < 12) codeSize += 1;
     } else {
       writeCode(clear);
       reset();
@@ -134,6 +135,8 @@ function lzw(indexes) {
     prefix = value;
   }
   writeCode(prefix);
+  // The decoder catches up on the final prefix before reading the end code.
+  if (nextCode === (1 << codeSize) && codeSize < 12) codeSize += 1;
   writeCode(end);
   if (bitCount > 0) bytes.push(currentByte & 0xff);
   return Uint8Array.from(bytes);

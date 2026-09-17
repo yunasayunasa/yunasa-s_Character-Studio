@@ -1,4 +1,4 @@
-const CACHE = "svg-character-studio-v2.0.5";
+const CACHE = "svg-character-studio-v2.0.6";
 const CORE = [
   "./",
   "./index.html",
